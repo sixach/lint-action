@@ -9,9 +9,9 @@ const { removeTrailingPeriod } = require("../utils/string");
 /**
  * https://eslint.org
  */
-class ESLint {
+class WPScriptsLint {
 	static get name() {
-		return "ESLint";
+		return "WP-Scripts";
 	}
 
 	/**
@@ -25,17 +25,17 @@ class ESLint {
 			throw new Error("NPM is not installed");
 		}
 
-		// Verify that ESLint is installed
+		// Verify that WPScripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} eslint -v`, { dir });
+			run(`${commandPrefix} wp-scripts`, { dir });
 		} catch (err) {
 			throw new Error(`${this.name} is not installed`);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
 	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
@@ -45,10 +45,10 @@ class ESLint {
 	 */
 	static lint(dir, extensions, args = "", fix = false, prefix = "") {
 		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const fixArg = fix ? "--fix" : "";
+		const lintArg = fix ? "lint-js" : "format";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} eslint --ext ${extensionsArg} ${fixArg} --no-color --format json ${args} "."`,
+			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args} "."`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -85,7 +85,7 @@ class ESLint {
 
 				// Exit if a fatal ESLint error occurred
 				if (fatal) {
-					throw Error(`ESLint error: ${message}`);
+					throw Error(`${this.name} Lint error: ${message}`);
 				}
 
 				const entry = {
@@ -106,4 +106,4 @@ class ESLint {
 	}
 }
 
-module.exports = ESLint;
+module.exports = WPScriptsLint;
