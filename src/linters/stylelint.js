@@ -8,9 +8,9 @@ const { getNpmBinCommand } = require("../utils/npm/get-npm-bin-command");
 /**
  * https://stylelint.io
  */
-class Stylelint {
+class WPScriptsLintCSS {
 	static get name() {
-		return "stylelint";
+		return "WP-Scripts";
 	}
 
 	/**
@@ -24,17 +24,17 @@ class Stylelint {
 			throw new Error("NPM is not installed");
 		}
 
-		// Verify that stylelint is installed
+		// Verify that wp-scripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} stylelint -v`, { dir });
+			run(`${commandPrefix} wp-scripts`, { dir });
 		} catch (err) {
 			throw new Error(`${this.name} is not installed`);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint-style command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
 	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
@@ -48,7 +48,7 @@ class Stylelint {
 		const fixArg = fix ? "--fix" : "";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} stylelint --no-color --formatter json ${fixArg} ${args} "${files}"`,
+			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -96,4 +96,4 @@ class Stylelint {
 	}
 }
 
-module.exports = Stylelint;
+module.exports = WPScriptsLintCSS;
