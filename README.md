@@ -20,26 +20,11 @@ _**Note:** The behavior of actions like this one is currently limited in the con
 
 - **CSS:**
   - [stylelint](https://stylelint.io)
-- **Go:**
-  - [gofmt](https://golang.org/cmd/gofmt)
-  - [golint](https://github.com/golang/lint)
 - **JavaScript:**
   - [ESLint](https://eslint.org)
   - [Prettier](https://prettier.io)
-  - [XO](https://github.com/xojs/xo)
 - **PHP:**
   - [PHP_CodeSniffer](https://github.com/squizlabs/PHP_CodeSniffer)
-- **Python:**
-  - [Black](https://black.readthedocs.io)
-  - [Flake8](http://flake8.pycqa.org)
-  - [Mypy](https://mypy.readthedocs.io/)
-  - [oitnb](https://pypi.org/project/oitnb/)
-- **Ruby:**
-  - [RuboCop](https://rubocop.readthedocs.io)
-- **Swift:**
-  - [swift-format](https://github.com/apple/swift-format) (official)
-  - [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) (by Nick Lockwood)
-  - [SwiftLint](https://github.com/realm/SwiftLint)
 
 ## Usage
 
@@ -203,51 +188,11 @@ jobs:
         with:
           php_codesniffer: true
 ```
-
-### Python example (Flake8 and Black)
-
-```yml
-name: Lint
-
-on:
-  # Trigger the workflow on push or pull request,
-  # but only for the main branch
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  run-linters:
-    name: Run linters
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v1
-        with:
-          python-version: 3.8
-
-      - name: Install Python dependencies
-        run: pip install black flake8
-
-      - name: Run linters
-        uses: wearerequired/lint-action@v1
-        with:
-          black: true
-          flake8: true
-```
-
 ## Configuration
 
 ### Linter-specific options
 
-`[linter]` can be one of `black`, `eslint`, `flake8`, `gofmt`, `golint`, `mypy`, `oitnb`, `php_codesniffer`, `prettier`, `rubocop`, `stylelint`, `swift_format_official`, `swift_format_lockwood`, `swiftlint` and `xo`:
+`[linter]` can be one of `eslint`, `php_codesniffer`, `prettier` and `stylelint`:
 
 - **`[linter]`:** Enables the linter in your repository. Default: `false`
 - **`[linter]_args`**: Additional arguments to pass to the linter. Example: `eslint_args: "--max-warnings 0"` if ESLint checks should fail even if there are no errors and only warnings. Default: `""`
@@ -285,21 +230,10 @@ Some options are not be available for specific linters:
 
 | Linter                | auto-fixing | extensions |
 | --------------------- | :---------: | :--------: |
-| black                 |     ✅      |     ✅     |
 | eslint                |     ✅      |     ✅     |
-| flake8                |     ❌      |     ✅     |
-| gofmt                 |     ✅      |  ❌ (go)   |
-| golint                |     ❌      |  ❌ (go)   |
-| mypy                  |     ✅      |     ✅     |
-| oitnb                 |     ✅      |     ✅     |
 | php_codesniffer       |     ❌      |     ✅     |
 | prettier              |     ✅      |     ✅     |
-| rubocop               |     ✅      |  ❌ (rb)   |
 | stylelint             |     ✅      |     ✅     |
-| swift_format_official |     ✅      |     ✅     |
-| swift_format_lockwood |     ✅      | ❌ (swift) |
-| swiftlint             |     ✅      | ❌ (swift) |
-| xo                    |     ✅      |     ✅     |
 
 ## Limitations
 

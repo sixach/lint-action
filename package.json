@@ -5,9 +5,9 @@
 	"author": {
 		"name": "Samuel Meuli",
 		"email": "me@samuelmeuli.com",
-		"url": "https://samuelmeuli.com"
+		"url": "https://sixa.ch/"
 	},
-	"repository": "github:wearerequired/lint-action",
+	"repository": "github:sixach/wpscripts-lint-action",
 	"license": "MIT",
 	"private": true,
 	"main": "./dist/index.js",

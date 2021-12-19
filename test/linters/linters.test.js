@@ -3,44 +3,19 @@ const { join } = require("path");
 const { copy, remove } = require("fs-extra");
 
 const { normalizeDates, normalizePaths, createTmpDir } = require("../test-utils");
-const blackParams = require("./params/black");
 const eslintParams = require("./params/eslint");
 const eslintTypescriptParams = require("./params/eslint-typescript");
-const flake8Params = require("./params/flake8");
-const gofmtParams = require("./params/gofmt");
-const golintParams = require("./params/golint");
-const mypyParams = require("./params/mypy");
 const phpCodeSnifferParams = require("./params/php-codesniffer");
 const prettierParams = require("./params/prettier");
-const ruboCopParams = require("./params/rubocop");
 const stylelintParams = require("./params/stylelint");
-const swiftFormatLockwood = require("./params/swift-format-lockwood");
-// const swiftFormatOfficial = require("./params/swift-format-official");
-const swiftlintParams = require("./params/swiftlint");
-const xoParams = require("./params/xo");
 
 const linterParams = [
-	blackParams,
 	eslintParams,
 	eslintTypescriptParams,
-	flake8Params,
-	gofmtParams,
-	golintParams,
-	mypyParams,
 	phpCodeSnifferParams,
 	prettierParams,
-	ruboCopParams,
 	stylelintParams,
-	xoParams,
 ];
-if (process.platform === "linux") {
-	// Temporarily disabled because swift-format 0.50300.0 no longer returns a proper exit code, yet
-	// returns the errors in STDERR.
-	// linterParams.push(swiftFormatOfficial);
-}
-if (process.platform === "darwin") {
-	linterParams.push(swiftFormatLockwood, swiftlintParams);
-}
 
 const tmpDir = createTmpDir();
 jest.setTimeout(300000);
