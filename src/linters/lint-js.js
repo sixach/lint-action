@@ -9,9 +9,9 @@ const { removeTrailingPeriod } = require("../utils/string");
 /**
  * https://eslint.org
  */
-class WPScriptsLint {
+class WPScriptsLintJS {
 	static get name() {
-		return "WP-Scripts Lint";
+		return "WP-Scripts Lint JS";
 	}
 
 	/**
@@ -106,4 +106,4 @@ class WPScriptsLint {
 	}
 }
 
-module.exports = WPScriptsLint;
+module.exports = WPScriptsLintJS;

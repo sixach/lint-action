@@ -64,22 +64,22 @@ inputs:
 
   # JavaScript
 
-  lint:
+  lint_js:
     description: Enable or disable WPScripts Lint check
     required: false
     default: "false"
-  lint_args:
+  lint_js_args:
     description: Additional arguments to pass to the linter
     required: false
     default: ""
-  lint_dir:
+  lint_js_dir:
     description: Directory where the WPScripts Lint command should be run
     required: false
-  lint_extensions:
+  lint_js_extensions:
     description: Extensions of files to check with WPScripts Lint
     required: false
     default: "js"
-  lint_command_prefix:
+  lint_js_command_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
     required: false
     default: ""

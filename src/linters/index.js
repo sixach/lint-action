@@ -1,9 +1,9 @@
-const Lint = require("./lint");
+const LintJs = require("./lint-js");
 const LintStyle = require("./lint-style");
 
 const linters = {
 	// Linters
-	lint: Lint,
+	lint_js: LintJs,
 	lint_style: LintStyle,
 };
 
