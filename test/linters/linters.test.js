@@ -5,15 +5,11 @@ const { copy, remove } = require("fs-extra");
 const { normalizeDates, normalizePaths, createTmpDir } = require("../test-utils");
 const eslintParams = require("./params/eslint");
 const eslintTypescriptParams = require("./params/eslint-typescript");
-const phpCodeSnifferParams = require("./params/php-codesniffer");
-const prettierParams = require("./params/prettier");
 const stylelintParams = require("./params/stylelint");
 
 const linterParams = [
 	eslintParams,
 	eslintTypescriptParams,
-	phpCodeSnifferParams,
-	prettierParams,
 	stylelintParams,
 ];
 

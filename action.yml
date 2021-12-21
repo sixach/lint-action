@@ -1,5 +1,5 @@
 name: WPScripts Lint Action
-author: Samuel Meuli
+author: Sixa
 description: GitHub Action for detecting and fixing WP theme/plugin linting errors
 
 inputs:
@@ -42,87 +42,45 @@ inputs:
 
   # CSS
 
-  stylelint:
-    description: Enable or disable stylelint checks
+  lint_style:
+    description: Enable or disable WPScripts Lint Style checks
     required: false
     default: "false"
-  stylelint_args:
+  lint_style_args:
     description: Additional arguments to pass to the linter
     required: false
     default: ""
-  stylelint_dir:
-    description: Directory where the stylelint command should be run
+  lint_style_dir:
+    description: Directory where the WPScripts Lint Style command should be run
     required: false
-  stylelint_extensions:
-    description: Extensions of files to check with stylelint
+  lint_style_extensions:
+    description: Extensions of files to check with WPScripts Lint Style
     required: false
     default: "css,sass,scss"
-  stylelint_command_prefix:
+  lint_style_command_prefix:
     description: Shell command to prepend to the linter command
     required: false
     default: ""
 
   # JavaScript
 
-  eslint:
-    description: Enable or disable ESLint checks
+  lint:
+    description: Enable or disable WPScripts Lint check
     required: false
     default: "false"
-  eslint_args:
+  lint_args:
     description: Additional arguments to pass to the linter
     required: false
     default: ""
-  eslint_dir:
-    description: Directory where the ESLint command should be run
+  lint_dir:
+    description: Directory where the WPScripts Lint command should be run
     required: false
-  eslint_extensions:
-    description: Extensions of files to check with ESLint
+  lint_extensions:
+    description: Extensions of files to check with WPScripts Lint
     required: false
     default: "js"
-  eslint_command_prefix:
+  lint_command_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
-    required: false
-    default: ""
-
-  prettier:
-    description: Enable or disable Prettier checks
-    required: false
-    default: "false"
-  prettier_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  prettier_dir:
-    description: Directory where the Prettier command should be run
-    required: false
-  prettier_extensions:
-    description: Extensions of files to check with Prettier
-    required: false
-    default: "css,html,js,json,jsx,md,sass,scss,ts,tsx,vue,yaml,yml"
-  prettier_command_prefix:
-    description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
-    required: false
-    default: ""
-
-  # PHP
-
-  php_codesniffer:
-    description: Enable or disable PHP_CodeSniffer checks
-    required: false
-    default: "false"
-  php_codesniffer_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  php_codesniffer_dir:
-    description: Directory where the PHP_CodeSniffer command should be run
-    required: false
-  php_codesniffer_extensions:
-    description: Extensions of files to check with PHP_CodeSniffer
-    required: false
-    default: "php"
-  php_codesniffer_command_prefix:
-    description: Shell command to prepend to the linter command
     required: false
     default: ""
 

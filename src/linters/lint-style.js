@@ -1,18 +1,16 @@
-const core = require("@actions/core");
-
 const { run } = require("../utils/action");
 const commandExists = require("../utils/command-exists");
 const { initLintResult } = require("../utils/lint-result");
-const { removeTrailingPeriod } = require("../utils/string");
+const { getNpmBinCommand } = require("../utils/npm/get-npm-bin-command");
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
 
 /**
- * https://github.com/squizlabs/PHP_CodeSniffer
+ * https://stylelint.io
  */
-class PHPCodeSniffer {
+class WPScriptsLintStyle {
 	static get name() {
-		return "PHP_CodeSniffer";
+		return "WP-Scripts Lint Style";
 	}
 
 	/**
@@ -21,21 +19,22 @@ class PHPCodeSniffer {
 	 * @param {string} prefix - Prefix to the lint command
 	 */
 	static async verifySetup(dir, prefix = "") {
-		// Verify that PHP is installed (required to execute phpcs)
-		if (!(await commandExists("php"))) {
-			throw new Error("PHP is not installed");
+		// Verify that NPM is installed (required to execute stylelint)
+		if (!(await commandExists("npm"))) {
+			throw new Error("NPM is not installed");
 		}
 
-		// Verify that phpcs is installed
+		// Verify that wp-scripts is installed
+		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${prefix} phpcs --version`, { dir });
+			run(`${commandPrefix} wp-scripts`, { dir });
 		} catch (err) {
 			throw new Error(`${this.name} is not installed`);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint-style command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
 	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
@@ -44,15 +43,17 @@ class PHPCodeSniffer {
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
 	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.join(",");
-		if (fix) {
-			core.warning(`${this.name} does not support auto-fixing`);
-		}
-
-		return run(`${prefix} phpcs --extensions=${extensionsArg} --report=json -q ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
+		const files =
+			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
+		const fixArg = fix ? "--fix" : "";
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		return run(
+			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`,
+			{
+				dir,
+				ignoreErrors: true,
+			},
+		);
 	}
 
 	/**
@@ -75,22 +76,18 @@ class PHPCodeSniffer {
 			);
 		}
 
-		for (const [file, violations] of Object.entries(outputJson.files)) {
-			const path = file.indexOf(dir) === 0 ? file.substring(dir.length + 1) : file;
-
-			for (const msg of violations.messages) {
-				const { line, message, source, type } = msg;
-
-				const entry = {
-					path,
-					firstLine: line,
-					lastLine: line,
-					message: `${removeTrailingPeriod(message)} (${source})`,
-				};
-				if (type === "WARNING") {
-					lintResult.warning.push(entry);
-				} else if (type === "ERROR") {
-					lintResult.error.push(entry);
+		for (const violation of outputJson) {
+			const { source, warnings } = violation;
+			const path = source.substring(dir.length + 1);
+			for (const warning of warnings) {
+				const { line, severity, text } = warning;
+				if (severity in lintResult) {
+					lintResult[severity].push({
+						path,
+						firstLine: line,
+						lastLine: line,
+						message: text,
+					});
 				}
 			}
 		}
@@ -99,4 +96,4 @@ class PHPCodeSniffer {
 	}
 }
 
-module.exports = PHPCodeSniffer;
+module.exports = WPScriptsLintStyle;

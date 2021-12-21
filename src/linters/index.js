@@ -1,16 +1,10 @@
-const ESLint = require("./eslint");
-const PHPCodeSniffer = require("./php-codesniffer");
-const Prettier = require("./prettier");
-const Stylelint = require("./stylelint");
+const Lint = require("./lint");
+const LintStyle = require("./lint-style");
 
 const linters = {
 	// Linters
-	eslint: ESLint,
-	php_codesniffer: PHPCodeSniffer,
-	stylelint: Stylelint,
-
-	// Formatters (should be run after linters)
-	prettier: Prettier,
+	lint: Lint,
+	lint_style: LintStyle,
 };
 
 module.exports = linters;

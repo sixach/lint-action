@@ -1,4 +1,4 @@
-const ESLint = require("../../../src/linters/eslint");
+const ESLint = require("../../../src/linters/lint");
 const { joinDoubleBackslash } = require("../../test-utils");
 
 const testName = "eslint";

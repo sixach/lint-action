@@ -2,15 +2,16 @@ const { run } = require("../utils/action");
 const commandExists = require("../utils/command-exists");
 const { initLintResult } = require("../utils/lint-result");
 const { getNpmBinCommand } = require("../utils/npm/get-npm-bin-command");
+const { removeTrailingPeriod } = require("../utils/string");
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
 
 /**
- * https://prettier.io
+ * https://eslint.org
  */
-class Prettier {
+class WPScriptsLint {
 	static get name() {
-		return "Prettier";
+		return "WP-Scripts Lint";
 	}
 
 	/**
@@ -19,22 +20,22 @@ class Prettier {
 	 * @param {string} prefix - Prefix to the lint command
 	 */
 	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute Prettier)
+		// Verify that NPM is installed (required to execute ESLint)
 		if (!(await commandExists("npm"))) {
 			throw new Error("NPM is not installed");
 		}
 
-		// Verify that Prettier is installed
+		// Verify that WPScripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} prettier -v`, { dir });
+			run(`${commandPrefix} wp-scripts`, { dir });
 		} catch (err) {
 			throw new Error(`${this.name} is not installed`);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
 	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
@@ -43,14 +44,16 @@ class Prettier {
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
 	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
-		const fixArg = fix ? "--write" : "--list-different";
+		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
+		const lintArg = fix ? "lint-js" : "format";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} prettier ${fixArg} --no-color ${args} "${files}"`, {
-			dir,
-			ignoreErrors: true,
-		});
+		return run(
+			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args} "."`,
+			{
+				dir,
+				ignoreErrors: true,
+			},
+		);
 	}
 
 	/**
@@ -63,21 +66,44 @@ class Prettier {
 	static parseOutput(dir, output) {
 		const lintResult = initLintResult();
 		lintResult.isSuccess = output.status === 0;
-		if (lintResult.isSuccess || !output) {
-			return lintResult;
+
+		let outputJson;
+		try {
+			outputJson = JSON.parse(output.stdout);
+		} catch (err) {
+			throw Error(
+				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
+			);
 		}
 
-		const paths = output.stdout.split(/\r?\n/);
-		lintResult.error = paths.map((path) => ({
-			path,
-			firstLine: 1,
-			lastLine: 1,
-			message:
-				"There are issues with this file's formatting, please run Prettier to fix the errors",
-		}));
+		for (const violation of outputJson) {
+			const { filePath, messages } = violation;
+			const path = filePath.substring(dir.length + 1);
+
+			for (const msg of messages) {
+				const { fatal, line, message, ruleId, severity } = msg;
+
+				// Exit if a fatal ESLint error occurred
+				if (fatal) {
+					throw Error(`${this.name} Lint error: ${message}`);
+				}
+
+				const entry = {
+					path,
+					firstLine: line,
+					lastLine: line,
+					message: `${removeTrailingPeriod(message)} (${ruleId})`,
+				};
+				if (severity === 1) {
+					lintResult.warning.push(entry);
+				} else if (severity === 2) {
+					lintResult.error.push(entry);
+				}
+			}
+		}
 
 		return lintResult;
 	}
 }
 
-module.exports = Prettier;
+module.exports = WPScriptsLint;

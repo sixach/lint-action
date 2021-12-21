@@ -2073,138 +2073,16 @@ module.exports = {
 
 /***/ }),
 
-/***/ 169:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(575);
-const commandExists = __nccwpck_require__(265);
-const { initLintResult } = __nccwpck_require__(149);
-const { getNpmBinCommand } = __nccwpck_require__(838);
-const { removeTrailingPeriod } = __nccwpck_require__(321);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://eslint.org
- */
-class ESLint {
-	static get name() {
-		return "ESLint";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute ESLint)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that ESLint is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} eslint -v`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const fixArg = fix ? "--fix" : "";
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} eslint --ext ${extensionsArg} ${fixArg} --no-color --format json ${args} "."`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		let outputJson;
-		try {
-			outputJson = JSON.parse(output.stdout);
-		} catch (err) {
-			throw Error(
-				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
-			);
-		}
-
-		for (const violation of outputJson) {
-			const { filePath, messages } = violation;
-			const path = filePath.substring(dir.length + 1);
-
-			for (const msg of messages) {
-				const { fatal, line, message, ruleId, severity } = msg;
-
-				// Exit if a fatal ESLint error occurred
-				if (fatal) {
-					throw Error(`ESLint error: ${message}`);
-				}
-
-				const entry = {
-					path,
-					firstLine: line,
-					lastLine: line,
-					message: `${removeTrailingPeriod(message)} (${ruleId})`,
-				};
-				if (severity === 1) {
-					lintResult.warning.push(entry);
-				} else if (severity === 2) {
-					lintResult.error.push(entry);
-				}
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = ESLint;
-
-
-/***/ }),
-
 /***/ 565:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const ESLint = __nccwpck_require__(169);
-const PHPCodeSniffer = __nccwpck_require__(405);
-const Prettier = __nccwpck_require__(460);
-const Stylelint = __nccwpck_require__(194);
+const Lint = __nccwpck_require__(306);
+const LintStyle = __nccwpck_require__(430);
 
 const linters = {
 	// Linters
-	eslint: ESLint,
-	php_codesniffer: PHPCodeSniffer,
-	stylelint: Stylelint,
-
-	// Formatters (should be run after linters)
-	prettier: Prettier,
+	lint: Lint,
+	lint_style: LintStyle,
 };
 
 module.exports = linters;
@@ -2212,206 +2090,7 @@ module.exports = linters;
 
 /***/ }),
 
-/***/ 405:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(186);
-
-const { run } = __nccwpck_require__(575);
-const commandExists = __nccwpck_require__(265);
-const { initLintResult } = __nccwpck_require__(149);
-const { removeTrailingPeriod } = __nccwpck_require__(321);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://github.com/squizlabs/PHP_CodeSniffer
- */
-class PHPCodeSniffer {
-	static get name() {
-		return "PHP_CodeSniffer";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that PHP is installed (required to execute phpcs)
-		if (!(await commandExists("php"))) {
-			throw new Error("PHP is not installed");
-		}
-
-		// Verify that phpcs is installed
-		try {
-			run(`${prefix} phpcs --version`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.join(",");
-		if (fix) {
-			core.warning(`${this.name} does not support auto-fixing`);
-		}
-
-		return run(`${prefix} phpcs --extensions=${extensionsArg} --report=json -q ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		let outputJson;
-		try {
-			outputJson = JSON.parse(output.stdout);
-		} catch (err) {
-			throw Error(
-				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
-			);
-		}
-
-		for (const [file, violations] of Object.entries(outputJson.files)) {
-			const path = file.indexOf(dir) === 0 ? file.substring(dir.length + 1) : file;
-
-			for (const msg of violations.messages) {
-				const { line, message, source, type } = msg;
-
-				const entry = {
-					path,
-					firstLine: line,
-					lastLine: line,
-					message: `${removeTrailingPeriod(message)} (${source})`,
-				};
-				if (type === "WARNING") {
-					lintResult.warning.push(entry);
-				} else if (type === "ERROR") {
-					lintResult.error.push(entry);
-				}
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = PHPCodeSniffer;
-
-
-/***/ }),
-
-/***/ 460:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(575);
-const commandExists = __nccwpck_require__(265);
-const { initLintResult } = __nccwpck_require__(149);
-const { getNpmBinCommand } = __nccwpck_require__(838);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://prettier.io
- */
-class Prettier {
-	static get name() {
-		return "Prettier";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute Prettier)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that Prettier is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} prettier -v`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
-		const fixArg = fix ? "--write" : "--list-different";
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} prettier ${fixArg} --no-color ${args} "${files}"`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-		if (lintResult.isSuccess || !output) {
-			return lintResult;
-		}
-
-		const paths = output.stdout.split(/\r?\n/);
-		lintResult.error = paths.map((path) => ({
-			path,
-			firstLine: 1,
-			lastLine: 1,
-			message:
-				"There are issues with this file's formatting, please run Prettier to fix the errors",
-		}));
-
-		return lintResult;
-	}
-}
-
-module.exports = Prettier;
-
-
-/***/ }),
-
-/***/ 194:
+/***/ 430:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { run } = __nccwpck_require__(575);
@@ -2424,9 +2103,9 @@ const { getNpmBinCommand } = __nccwpck_require__(838);
 /**
  * https://stylelint.io
  */
-class Stylelint {
+class WPScriptsLintStyle {
 	static get name() {
-		return "stylelint";
+		return "WP-Scripts Lint Style";
 	}
 
 	/**
@@ -2440,17 +2119,17 @@ class Stylelint {
 			throw new Error("NPM is not installed");
 		}
 
-		// Verify that stylelint is installed
+		// Verify that wp-scripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} stylelint -v`, { dir });
+			run(`${commandPrefix} wp-scripts`, { dir });
 		} catch (err) {
 			throw new Error(`${this.name} is not installed`);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint-style command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
 	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
@@ -2464,7 +2143,7 @@ class Stylelint {
 		const fixArg = fix ? "--fix" : "";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} stylelint --no-color --formatter json ${fixArg} ${args} "${files}"`,
+			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -2512,7 +2191,123 @@ class Stylelint {
 	}
 }
 
-module.exports = Stylelint;
+module.exports = WPScriptsLintStyle;
+
+
+/***/ }),
+
+/***/ 306:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const { run } = __nccwpck_require__(575);
+const commandExists = __nccwpck_require__(265);
+const { initLintResult } = __nccwpck_require__(149);
+const { getNpmBinCommand } = __nccwpck_require__(838);
+const { removeTrailingPeriod } = __nccwpck_require__(321);
+
+/** @typedef {import('../utils/lint-result').LintResult} LintResult */
+
+/**
+ * https://eslint.org
+ */
+class WPScriptsLint {
+	static get name() {
+		return "WP-Scripts Lint";
+	}
+
+	/**
+	 * Verifies that all required programs are installed. Throws an error if programs are missing
+	 * @param {string} dir - Directory to run the linting program in
+	 * @param {string} prefix - Prefix to the lint command
+	 */
+	static async verifySetup(dir, prefix = "") {
+		// Verify that NPM is installed (required to execute ESLint)
+		if (!(await commandExists("npm"))) {
+			throw new Error("NPM is not installed");
+		}
+
+		// Verify that WPScripts is installed
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		try {
+			run(`${commandPrefix} wp-scripts`, { dir });
+		} catch (err) {
+			throw new Error(`${this.name} is not installed`);
+		}
+	}
+
+	/**
+	 * Runs the lint command and returns the command output
+	 * @param {string} dir - Directory to run the linter in
+	 * @param {string[]} extensions - File extensions which should be linted
+	 * @param {string} args - Additional arguments to pass to the linter
+	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
+	 * @param {string} prefix - Prefix to the lint command
+	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
+	 */
+	static lint(dir, extensions, args = "", fix = false, prefix = "") {
+		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
+		const lintArg = fix ? "lint-js" : "format";
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		return run(
+			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args} "."`,
+			{
+				dir,
+				ignoreErrors: true,
+			},
+		);
+	}
+
+	/**
+	 * Parses the output of the lint command. Determines the success of the lint process and the
+	 * severity of the identified code style violations
+	 * @param {string} dir - Directory in which the linter has been run
+	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
+	 * @returns {LintResult} - Parsed lint result
+	 */
+	static parseOutput(dir, output) {
+		const lintResult = initLintResult();
+		lintResult.isSuccess = output.status === 0;
+
+		let outputJson;
+		try {
+			outputJson = JSON.parse(output.stdout);
+		} catch (err) {
+			throw Error(
+				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
+			);
+		}
+
+		for (const violation of outputJson) {
+			const { filePath, messages } = violation;
+			const path = filePath.substring(dir.length + 1);
+
+			for (const msg of messages) {
+				const { fatal, line, message, ruleId, severity } = msg;
+
+				// Exit if a fatal ESLint error occurred
+				if (fatal) {
+					throw Error(`${this.name} Lint error: ${message}`);
+				}
+
+				const entry = {
+					path,
+					firstLine: line,
+					lastLine: line,
+					message: `${removeTrailingPeriod(message)} (${ruleId})`,
+				};
+				if (severity === 1) {
+					lintResult.warning.push(entry);
+				} else if (severity === 2) {
+					lintResult.error.push(entry);
+				}
+			}
+		}
+
+		return lintResult;
+	}
+}
+
+module.exports = WPScriptsLint;
 
 
 /***/ }),
