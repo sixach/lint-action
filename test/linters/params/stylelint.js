@@ -56,7 +56,7 @@ function getFixParams(dir) {
 	const stdoutFile1 = `{"source":"${joinDoubleBackslash(
 		dir,
 		"file1.css",
-	)}","deprecations":[],"invalidOptionWarnings":[],"parseErrors":[],"errored":false,"warnings":[]}`;
+	)}","deprecations":[],"invalidOptionWarnings":[],"parseErrors":[],"errored":true,"warnings":[{"line":2,"column":9,"rule":"color-named","severity":"error","text":"Unexpected named color \\"red\\" (color-named)"}]}`;
 	const stdoutFile2 = `{"source":"${joinDoubleBackslash(
 		dir,
 		"file2.scss",
@@ -73,6 +73,12 @@ function getFixParams(dir) {
 			isSuccess: false,
 			warning: [],
 			error: [
+				{
+					path: "file1.css",
+					firstLine: 2,
+					lastLine: 2,
+					message: "Unexpected named color \"red\" (color-named)",
+				},
 				{
 					path: "file2.scss",
 					firstLine: 1,
