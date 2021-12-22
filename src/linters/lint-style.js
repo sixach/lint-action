@@ -27,9 +27,9 @@ class WPScriptsLintStyle {
 		// Verify that wp-scripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} wp-scripts`, { dir });
+			run(`${commandPrefix} wp-scripts lint-style -v`, { dir });
 		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
+			throw new Error(err.message);
 		}
 	}
 
