@@ -3,9 +3,7 @@
 	"main": "index.js",
 	"private": true,
 	"devDependencies": {
-		"@typescript-eslint/eslint-plugin": "^4.17.0",
-		"@typescript-eslint/parser": "^4.17.0",
-		"eslint": "^7.21.0",
+		"@wordpress/scripts": "^19.2.2",
 		"typescript": "^4.2.3"
 	}
 }
