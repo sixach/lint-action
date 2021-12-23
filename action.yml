@@ -65,7 +65,7 @@ inputs:
   # JavaScript
 
   lint_js:
-    description: Enable or disable WPScripts Lint check
+    description: Enable or disable WPScripts Lint JS check
     required: false
     default: "false"
   lint_js_args:
@@ -73,13 +73,35 @@ inputs:
     required: false
     default: ""
   lint_js_dir:
-    description: Directory where the WPScripts Lint command should be run
+    description: Directory where the WPScripts Lint JS command should be run
     required: false
   lint_js_extensions:
-    description: Extensions of files to check with WPScripts Lint
+    description: Extensions of files to check with WPScripts Lint JS
     required: false
     default: "js"
   lint_js_command_prefix:
+    description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
+    required: false
+    default: ""
+
+# JavaScript in Markdown
+
+  lint_md_js:
+    description: Enable or disable WPScripts Lint Markdown JS check
+    required: false
+    default: "false"
+  lint_md_js_args:
+    description: Additional arguments to pass to the linter
+    required: false
+    default: ""
+  lint_md_js_dir:
+    description: Directory where the WPScripts Lint Markdown JS command should be run
+    required: false
+  lint_md_js_extensions:
+    description: Extensions of files to check with WPScripts Lint Markdown JS
+    required: false
+    default: "md"
+  lint_md_js_command_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
     required: false
     default: ""
