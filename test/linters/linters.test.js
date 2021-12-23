@@ -48,34 +48,40 @@ describe.each(linterParams)(
 				// Exit code
 				expect(cmdOutput.status).toEqual(expected.cmdOutput.status);
 
-				// stdout
-				let stdout = normalizeDates(cmdOutput.stdout);
-				stdout = normalizePaths(stdout, tmpDir);
-				if ("stdoutParts" in expected.cmdOutput) {
-					expected.cmdOutput.stdoutParts.forEach((stdoutPart) =>
-						expect(stdout).toEqual(expect.stringContaining(stdoutPart)),
-					);
-				} else if ("stdout" in expected.cmdOutput) {
-					expect(stdout).toEqual(expected.cmdOutput.stdout);
-				}
+				// Skip test for `wp-scripts format`
+				if (!(autoFix && linter.name === 'WP-Scripts Lint JS')) {
+					// stdout
+					let stdout = normalizeDates(cmdOutput.stdout);
+					stdout = normalizePaths(stdout, tmpDir);
+					if ("stdoutParts" in expected.cmdOutput) {
+						expected.cmdOutput.stdoutParts.forEach((stdoutPart) =>
+							expect(stdout).toEqual(expect.stringContaining(stdoutPart)),
+						);
+					} else if ("stdout" in expected.cmdOutput) {
+						expect(stdout).toEqual(expected.cmdOutput.stdout);
+					}
 
-				// stderr
-				let stderr = normalizeDates(cmdOutput.stderr);
-				stderr = normalizePaths(stderr, tmpDir);
-				if ("stderrParts" in expected.cmdOutput) {
-					expected.cmdOutput.stderrParts.forEach((stderrParts) =>
-						expect(stderr).toEqual(expect.stringContaining(stderrParts)),
-					);
-				} else if ("stderr" in expected.cmdOutput) {
-					expect(stderr).toEqual(expected.cmdOutput.stderr);
+					// stderr
+					let stderr = normalizeDates(cmdOutput.stderr);
+					stderr = normalizePaths(stderr, tmpDir);
+					if ("stderrParts" in expected.cmdOutput) {
+						expected.cmdOutput.stderrParts.forEach((stderrParts) =>
+							expect(stderr).toEqual(expect.stringContaining(stderrParts)),
+						);
+					} else if ("stderr" in expected.cmdOutput) {
+						expect(stderr).toEqual(expected.cmdOutput.stderr);
+					}
 				}
 			});
 
-			// Test `parseOutput` function
-			test(`${linter.name} parses ${lintMode} output correctly`, () => {
-				const lintResult = linter.parseOutput(projectTmpDir, expected.cmdOutput);
-				expect(lintResult).toEqual(expected.lintResult);
-			});
+			// Skip test for `wp-scripts format`
+			if (!(autoFix && linter.name === 'WP-Scripts Lint JS')) {
+				// Test `parseOutput` function
+				test(`${linter.name} parses ${lintMode} output correctly`, () => {
+					const lintResult = linter.parseOutput(projectTmpDir, expected.cmdOutput);
+					expect(lintResult).toEqual(expected.lintResult);
+				});
+			}
 		});
 	},
 );
