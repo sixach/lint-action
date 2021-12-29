@@ -1,7 +1,1180 @@
-/******/ (() => { // webpackBootstrap
+require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 241:
+/***/ 374:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __importDefault(__nccwpck_require__(186));
+const action_1 = __nccwpck_require__(194);
+/** @typedef {import('./github/context').GithubContext} GithubContext */
+/**
+ * Fetches and checks out the remote Git branch (if it exists, the fork repository will be used)
+ * @param {GithubContext} context - Information about the GitHub
+ */
+function checkOutRemoteBranch(context) {
+    if (context.repository.hasFork) {
+        // Fork: Add fork repo as remote
+        core_1.default.info(`Adding "${context.repository.forkName}" fork as remote with Git`);
+        const cloneURl = new URL(context.repository.forkCloneUrl);
+        cloneURl.username = context.actor;
+        cloneURl.username = context.token;
+        (0, action_1.run)(`git remote add fork ${cloneURl.toString()}`);
+    }
+    else {
+        // No fork: Update remote URL to include auth information (so auto-fixes can be pushed)
+        core_1.default.info(`Adding auth information to Git remote URL`);
+        const cloneURl = new URL(context.repository.cloneUrl);
+        cloneURl.username = context.actor;
+        cloneURl.username = context.token;
+        (0, action_1.run)(`git remote set-url origin ${cloneURl.toString()}`);
+    }
+    const remote = context.repository.hasFork ? 'fork' : 'origin';
+    // Fetch remote branch
+    core_1.default.info(`Fetching remote branch "${context.branch}"`);
+    (0, action_1.run)(`git fetch --no-tags --depth=1 ${remote} ${context.branch}`);
+    // Switch to remote branch
+    core_1.default.info(`Switching to the "${context.branch}" branch`);
+    (0, action_1.run)(`git branch --force ${context.branch} --track ${remote}/${context.branch}`);
+    (0, action_1.run)(`git checkout ${context.branch}`);
+}
+/**
+ * Stages and commits all changes using Git
+ * @param {string} message - Git commit message
+ * @param {boolean} skipVerification - Skip Git verification
+ */
+function commitChanges(message, skipVerification) {
+    core_1.default.info(`Committing changes`);
+    (0, action_1.run)(`git commit -am "${message}"${skipVerification ? ' --no-verify' : ''}`);
+}
+/**
+ * Returns the SHA of the head commit
+ * @returns {string} - Head SHA
+ */
+function getHeadSha() {
+    const sha = (0, action_1.run)('git rev-parse HEAD').stdout;
+    core_1.default.info(`SHA of last commit is "${sha}"`);
+    return sha;
+}
+/**
+ * Checks whether there are differences from HEAD
+ * @returns {boolean} - Boolean indicating whether changes exist
+ */
+function hasChanges() {
+    const output = (0, action_1.run)('git diff-index --name-status --exit-code HEAD --', {
+        ignoreErrors: true
+    });
+    const hasChangedFiles = output.status === 1;
+    core_1.default.info(`${hasChangedFiles ? 'Changes' : 'No changes'} found with Git`);
+    return hasChangedFiles;
+}
+/**
+ * Pushes all changes to the remote repository
+ * @param {boolean} skipVerification - Skip Git verification
+ */
+function pushChanges(skipVerification) {
+    core_1.default.info('Pushing changes with Git');
+    (0, action_1.run)(`git push${skipVerification ? ' --no-verify' : ''}`);
+}
+/**
+ * Updates the global Git configuration with the provided information
+ * @param {string} name - Git username
+ * @param {string} email - Git email address
+ */
+function setUserInfo(name, email) {
+    core_1.default.info(`Setting Git user information`);
+    (0, action_1.run)(`git config --global user.name "${name}"`);
+    (0, action_1.run)(`git config --global user.email "${email}"`);
+}
+exports["default"] = {
+    checkOutRemoteBranch,
+    commitChanges,
+    getHeadSha,
+    hasChanges,
+    pushChanges,
+    setUserInfo
+};
+
+
+/***/ }),
+
+/***/ 934:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createCheck = void 0;
+const string_1 = __nccwpck_require__(743);
+const core_1 = __importDefault(__nccwpck_require__(186));
+const package_json_1 = __nccwpck_require__(598);
+const request_1 = __importDefault(__nccwpck_require__(155));
+/** @typedef {import('./context').GithubContext} GithubContext */
+/** @typedef {import('../utils/lint-result').LintResult} LintResult */
+/**
+ * Creates a new check on GitHub which annotates the relevant commit with linting errors
+ * @param {string} linterName - Name of the linter for which a check should be created
+ * @param {string} sha - SHA of the commit which should be annotated
+ * @param {GithubContext} context - Information about the GitHub repository and
+ * action trigger event
+ * @param {LintResult} lintResult - Parsed lint result
+ * @param {boolean} neutralCheckOnWarning - Whether the check run should conclude as neutral if
+ * there are only warnings
+ * @param {string} summary - Summary for the GitHub check
+ */
+function createCheck(linterName, sha, context, lintResult, neutralCheckOnWarning, summary) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let annotations = [];
+        for (const level of ['warning', 'error']) {
+            annotations = [
+                ...annotations,
+                ...lintResult[level].map(result => ({
+                    path: result.path,
+                    start_line: result.firstLine,
+                    end_line: result.lastLine,
+                    annotation_level: level === 'warning' ? 'warning' : 'failure',
+                    message: result.message
+                }))
+            ];
+        }
+        // Only use the first 50 annotations (limit for a single API request)
+        if (annotations.length > 50) {
+            core_1.default.info(`There are more than 50 errors/warnings from ${linterName}. Annotations are created for the first 50 issues only.`);
+            annotations = annotations.slice(0, 50);
+        }
+        let conclusion;
+        if (lintResult.isSuccess) {
+            if (annotations.length > 0 && neutralCheckOnWarning) {
+                conclusion = 'neutral';
+            }
+            else {
+                conclusion = 'success';
+            }
+        }
+        else {
+            conclusion = 'failure';
+        }
+        const body = {
+            name: linterName,
+            head_sha: sha,
+            conclusion,
+            output: {
+                title: (0, string_1.capitalizeFirstLetter)(summary),
+                summary: `${linterName} found ${summary}`,
+                annotations
+            }
+        };
+        try {
+            core_1.default.info(`Creating GitHub check with ${conclusion} conclusion and ${annotations.length} annotations for ${linterName}…`);
+            yield (0, request_1.default)(`${process.env.GITHUB_API_URL}/repos/${context.repository.repoName}/check-runs`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // "Accept" header is required to access Checks API during preview period
+                    Accept: 'application/vnd.github.antiope-preview+json',
+                    Authorization: `Bearer ${context.token}`,
+                    'User-Agent': package_json_1.name
+                },
+                body
+            });
+            core_1.default.info(`${linterName} check created successfully`);
+        }
+        catch (err) {
+            core_1.default.error(err);
+            throw new Error(`Error trying to create GitHub check for ${linterName}: ${err.message}`);
+        }
+    });
+}
+exports.createCheck = createCheck;
+
+
+/***/ }),
+
+/***/ 963:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.parseRepository = exports.parseEnvFile = exports.parseBranch = exports.parseActionEnv = exports.getContext = void 0;
+const core_1 = __importDefault(__nccwpck_require__(186));
+const action_1 = __nccwpck_require__(194);
+const package_json_1 = __nccwpck_require__(598);
+const fs_1 = __nccwpck_require__(147);
+/**
+ * GitHub Actions workflow's environment variables
+ * @typedef ActionEnv
+ * @property {string} actor Event actor.
+ * @property {string} eventName Event name.
+ * @property {string} eventPath Event path.
+ * @property {string} token Token.
+ * @property {string} workspace Workspace path.
+ */
+/**
+ * Information about the GitHub repository and its fork (if it exists)
+ * @typedef GithubRepository
+ * @property {string} repoName Repo name.
+ * @property {string} cloneUrl Repo clone URL.
+ * @property {string} forkName Fork name.
+ * @property {string} forkCloneUrl Fork repo clone URL.
+ * @property {boolean} hasFork Whether repo has a fork.
+ */
+/**
+ * Information about the GitHub repository and action trigger event
+ * @typedef GithubContext
+ * @property {string} actor Event actor.
+ * @property {string} branch Branch name.
+ * @property {object} event Event.
+ * @property {string} eventName Event name.
+ * @property {GithubRepository} repository Information about the GitHub repository
+ * @property {string} token Token.
+ * @property {string} workspace Workspace path.
+ */
+/**
+ * Returns the GitHub Actions workflow's environment variables
+ * @returns {ActionEnv} GitHub Actions workflow's environment variables
+ */
+function parseActionEnv() {
+    return {
+        // Information provided by environment
+        actor: (0, action_1.getEnv)('github_actor', true),
+        eventName: (0, action_1.getEnv)('github_event_name', true),
+        eventPath: (0, action_1.getEnv)('github_event_path', true),
+        workspace: (0, action_1.getEnv)('github_workspace', true),
+        // Information provided by action user
+        token: core_1.default.getInput('github_token', { required: true })
+    };
+}
+exports.parseActionEnv = parseActionEnv;
+/**
+ * Parse `event.json` file (file with the complete webhook event payload, automatically provided by
+ * GitHub)
+ * @param {string} eventPath - Path to the `event.json` file
+ * @returns {object} - Webhook event payload
+ */
+function parseEnvFile(eventPath) {
+    const eventBuffer = (0, fs_1.readFileSync)(eventPath);
+    return JSON.parse(eventBuffer);
+}
+exports.parseEnvFile = parseEnvFile;
+/**
+ * Parses the name of the current branch from the GitHub webhook event
+ * @param {string} eventName - GitHub event type
+ * @param {object} event - GitHub webhook event payload
+ * @returns {string} - Branch name
+ */
+function parseBranch(eventName, event) {
+    if (eventName === 'push' || eventName === 'workflow_dispatch') {
+        return event.ref.substring(11); // Remove "refs/heads/" from start of string
+    }
+    if (eventName === 'pull_request' || eventName === 'pull_request_target') {
+        return event.pull_request.head.ref;
+    }
+    throw Error(`${package_json_1.name} does not support "${eventName}" GitHub events`);
+}
+exports.parseBranch = parseBranch;
+/**
+ * Parses the name of the current repository and determines whether it has a corresponding fork.
+ * Fork detection is only supported for the "pull_request" event
+ * @param {string} eventName - GitHub event type
+ * @param {object} event - GitHub webhook event payload
+ * @returns {GithubRepository} - Information about the GitHub repository and its fork (if it exists)
+ */
+function parseRepository(eventName, event) {
+    const repoName = event.repository.full_name;
+    const cloneUrl = event.repository.clone_url;
+    let forkName;
+    let forkCloneUrl;
+    if (eventName === 'pull_request' || eventName === 'pull_request_target') {
+        // "pull_request" events are triggered on the repository where the PR is made. The PR branch can
+        // be on the same repository (`forkRepository` is set to `null`) or on a fork (`forkRepository`
+        // is defined)
+        const headRepoName = event.pull_request.head.repo.full_name;
+        forkName = repoName === headRepoName ? undefined : headRepoName;
+        const headForkCloneUrl = event.pull_request.head.repo.clone_url;
+        forkCloneUrl = cloneUrl === headForkCloneUrl ? undefined : headForkCloneUrl;
+    }
+    return {
+        repoName,
+        cloneUrl,
+        forkName,
+        forkCloneUrl,
+        hasFork: forkName != null && forkName !== repoName
+    };
+}
+exports.parseRepository = parseRepository;
+/**
+ * Returns information about the GitHub repository and action trigger event
+ * @returns {GithubContext} context - Information about the GitHub repository and action trigger
+ * event
+ */
+function getContext() {
+    const { actor, eventName, eventPath, token, workspace } = parseActionEnv();
+    const event = parseEnvFile(eventPath);
+    return {
+        actor,
+        branch: parseBranch(eventName, event),
+        event,
+        eventName,
+        repository: parseRepository(eventName, event),
+        token,
+        workspace
+    };
+}
+exports.getContext = getContext;
+
+
+/***/ }),
+
+/***/ 822:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const core_1 = __importDefault(__nccwpck_require__(186));
+const api_1 = __nccwpck_require__(934);
+const context_1 = __nccwpck_require__(963);
+const lint_result_1 = __nccwpck_require__(735);
+const git_1 = __importDefault(__nccwpck_require__(374));
+const path_1 = __nccwpck_require__(17);
+const linters_1 = __importDefault(__nccwpck_require__(975));
+/**
+ * Parses the action configuration and runs all enabled linters on matching files
+ */
+function runAction() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const context = (0, context_1.getContext)();
+        const autoFix = core_1.default.getInput('auto_fix') === 'true';
+        const skipVerification = core_1.default.getInput('git_no_verify') === 'true';
+        const continueOnError = core_1.default.getInput('continue_on_error') === 'true';
+        const gitName = core_1.default.getInput('git_name', { required: true });
+        const gitEmail = core_1.default.getInput('git_email', { required: true });
+        const commitMessage = core_1.default.getInput('commit_message', { required: true });
+        const checkName = core_1.default.getInput('check_name', { required: true });
+        const neutralCheckOnWarning = core_1.default.getInput('neutral_check_on_warning') === 'true';
+        const isPullRequest = context.eventName === 'pull_request' ||
+            context.eventName === 'pull_request_target';
+        // If on a PR from fork: Display messages regarding action limitations
+        if (isPullRequest && context.repository.hasFork) {
+            core_1.default.error('This action does not have permission to create annotations on forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details');
+            if (autoFix) {
+                core_1.default.error('This action does not have permission to push to forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details');
+            }
+        }
+        if (autoFix) {
+            // Set Git committer username and password
+            git_1.default.setUserInfo(gitName, gitEmail);
+        }
+        if (isPullRequest) {
+            // Fetch and check out PR branch:
+            // - "push" event: Already on correct branch
+            // - "pull_request" event on origin, for code on origin: The Checkout Action
+            //   (https://github.com/actions/checkout) checks out the PR's test merge commit instead of the
+            //   PR branch. Git is therefore in detached head state. To be able to push changes, the branch
+            //   needs to be fetched and checked out first
+            // - "pull_request" event on origin, for code on fork: Same as above, but the repo/branch where
+            //   changes need to be pushed is not yet available. The fork needs to be added as a Git remote
+            //   first
+            git_1.default.checkOutRemoteBranch(context);
+        }
+        let headSha = git_1.default.getHeadSha();
+        let hasFailures = false;
+        const checks = [];
+        // Loop over all available linters
+        for (const [linterId, linter] of Object.entries(linters_1.default)) {
+            // Determine whether the linter should be executed on the commit
+            if (core_1.default.getInput(linterId) === 'true') {
+                core_1.default.startGroup(`Run ${linter.name}`);
+                const fileExtensions = core_1.default.getInput(`${linterId}_extensions`, {
+                    required: true
+                });
+                const args = core_1.default.getInput(`${linterId}_args`);
+                const lintDirRel = core_1.default.getInput(`${linterId}_dir`) || '.';
+                const prefix = core_1.default.getInput(`${linterId}_command_prefix`);
+                const lintDirAbs = (0, path_1.join)(context.workspace, lintDirRel);
+                // Check that the linter and its dependencies are installed
+                core_1.default.info(`Verifying setup for ${linter.name}…`);
+                yield linter.verifySetup(lintDirAbs, prefix);
+                core_1.default.info(`Verified ${linter.name} setup`);
+                // Determine which files should be linted
+                const fileExtList = fileExtensions.split(',');
+                core_1.default.info(`Will use ${linter.name} to check the files with extensions ${fileExtList}`);
+                // Lint and optionally auto-fix the matching files, parse code style violations
+                core_1.default.info(`Linting ${autoFix ? 'and auto-fixing ' : ''}files in ${lintDirAbs} with ${linter.name}…`);
+                const lintOutput = linter.lint(lintDirAbs, fileExtList, args, autoFix, prefix);
+                // Parse output of linting command
+                const lintResult = linter.parseOutput(context.workspace, lintOutput);
+                const summary = (0, lint_result_1.getSummary)(lintResult);
+                core_1.default.info(`${linter.name} found ${summary} (${lintResult.isSuccess ? 'success' : 'failure'})`);
+                if (!lintResult.isSuccess) {
+                    hasFailures = true;
+                }
+                if (autoFix) {
+                    // Commit and push auto-fix changes
+                    if (git_1.default.hasChanges()) {
+                        git_1.default.commitChanges(commitMessage.replace(/\${linter}/g, linter.name), skipVerification);
+                        git_1.default.pushChanges(skipVerification);
+                    }
+                }
+                const lintCheckName = checkName
+                    .replace(/\${linter}/g, linter.name)
+                    .replace(/\${dir}/g, lintDirRel !== '.' ? `${lintDirRel}` : '')
+                    .trim();
+                checks.push({ lintCheckName, lintResult, summary });
+                core_1.default.endGroup();
+            }
+        }
+        // Add commit annotations after running all linters. To be displayed on pull requests, the
+        // annotations must be added to the last commit on the branch. This can either be a user commit or
+        // one of the auto-fix commits
+        if (isPullRequest && autoFix) {
+            headSha = git_1.default.getHeadSha();
+        }
+        core_1.default.startGroup('Create check runs with commit annotations');
+        yield Promise.all(checks.map(({ lintCheckName, lintResult, summary }) => (0, api_1.createCheck)(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary)));
+        core_1.default.endGroup();
+        if (hasFailures && !continueOnError) {
+            core_1.default.setFailed('Linting failures detected. See check runs with annotations for details.');
+        }
+    });
+}
+runAction().catch(error => {
+    core_1.default.debug(error.stack || 'No error stack trace');
+    core_1.default.setFailed(error.message);
+});
+
+
+/***/ }),
+
+/***/ 975:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const lint_js_1 = __importDefault(__nccwpck_require__(113));
+const lint_md_js_1 = __importDefault(__nccwpck_require__(105));
+const lint_style_1 = __importDefault(__nccwpck_require__(881));
+const linters = {
+    // Linters
+    lint_js: lint_js_1.default,
+    lint_md_js: lint_md_js_1.default,
+    lint_style: lint_style_1.default
+};
+exports["default"] = linters;
+
+
+/***/ }),
+
+/***/ 113:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const command_exists_1 = __importDefault(__nccwpck_require__(416));
+const get_npm_bin_command_1 = __nccwpck_require__(559);
+const lint_result_1 = __nccwpck_require__(735);
+const string_1 = __nccwpck_require__(743);
+const action_1 = __nccwpck_require__(194);
+/** @typedef {import('../utils/lint-result').LintResult} LintResult */
+/**
+ * https://eslint.org
+ */
+class WPScriptsLintJS {
+    static get name() {
+        return 'WP-Scripts Lint JS';
+    }
+    /**
+     * Verifies that all required programs are installed. Throws an error if programs are missing
+     * @param {string} dir - Directory to run the linting program in
+     * @param {string} prefix - Prefix to the lint command
+     */
+    static verifySetup(dir, prefix = '') {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Verify that NPM is installed (required to execute ESLint)
+            if (!(yield (0, command_exists_1.default)('npm'))) {
+                throw new Error('NPM is not installed');
+            }
+            // Verify that WPScripts is installed
+            const commandPrefix = prefix || (0, get_npm_bin_command_1.getNpmBinCommand)(dir);
+            try {
+                (0, action_1.run)(`${commandPrefix} wp-scripts lint-js -v`, { dir });
+            }
+            catch (err) {
+                throw new Error(err.message);
+            }
+        });
+    }
+    /**
+     * Runs the lint command and returns the command output
+     * @param {string} dir - Directory to run the linter in
+     * @param {string[]} extensions - File extensions which should be linted
+     * @param {string} args - Additional arguments to pass to the linter
+     * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
+     * @param {string} prefix - Prefix to the lint command
+     * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
+     */
+    static lint(dir, extensions, args = '', fix = false, prefix = '') {
+        const extensionsArg = extensions.map(ext => `.${ext}`).join(',');
+        const lintArg = fix ? 'format' : 'lint-js';
+        const commandPrefix = prefix || (0, get_npm_bin_command_1.getNpmBinCommand)(dir);
+        return (0, action_1.run)(`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args} "."`, {
+            dir,
+            ignoreErrors: true
+        });
+    }
+    /**
+     * Parses the output of the lint command. Determines the success of the lint process and the
+     * severity of the identified code style violations
+     * @param {string} dir - Directory in which the linter has been run
+     * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
+     * @returns {LintResult} - Parsed lint result
+     */
+    static parseOutput(dir, output) {
+        const lintResult = (0, lint_result_1.initLintResult)();
+        lintResult.isSuccess = output.status === 0;
+        let outputJson;
+        try {
+            outputJson = JSON.parse(output.stdout);
+        }
+        catch (err) {
+            throw Error(`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`);
+        }
+        for (const violation of outputJson) {
+            const { filePath, messages } = violation;
+            const path = filePath.substring(dir.length + 1);
+            for (const msg of messages) {
+                const { fatal, line, message, ruleId, severity } = msg;
+                // Exit if a fatal ESLint error occurred
+                if (fatal) {
+                    throw Error(`${this.name} Lint error: ${message}`);
+                }
+                const entry = {
+                    path,
+                    firstLine: line,
+                    lastLine: line,
+                    message: `${(0, string_1.removeTrailingPeriod)(message)} (${ruleId})`
+                };
+                if (severity === 1) {
+                    lintResult.warning.push(entry);
+                }
+                else if (severity === 2) {
+                    lintResult.error.push(entry);
+                }
+            }
+        }
+        return lintResult;
+    }
+}
+exports["default"] = WPScriptsLintJS;
+
+
+/***/ }),
+
+/***/ 105:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const command_exists_1 = __importDefault(__nccwpck_require__(416));
+const get_npm_bin_command_1 = __nccwpck_require__(559);
+const lint_result_1 = __nccwpck_require__(735);
+const string_1 = __nccwpck_require__(743);
+const action_1 = __nccwpck_require__(194);
+/** @typedef {import('../utils/lint-result').LintResult} LintResult */
+/**
+ * https://eslint.org
+ */
+class WPScriptsLintMDJS {
+    static get name() {
+        return 'WP-Scripts Lint MD JS';
+    }
+    /**
+     * Verifies that all required programs are installed. Throws an error if programs are missing
+     * @param {string} dir - Directory to run the linting program in
+     * @param {string} prefix - Prefix to the lint command
+     */
+    static verifySetup(dir, prefix = '') {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Verify that NPM is installed (required to execute ESLint)
+            if (!(yield (0, command_exists_1.default)('npm'))) {
+                throw new Error('NPM is not installed');
+            }
+            // Verify that WPScripts is installed
+            const commandPrefix = prefix || (0, get_npm_bin_command_1.getNpmBinCommand)(dir);
+            try {
+                (0, action_1.run)(`${commandPrefix} wp-scripts lint-md-js -v`, { dir });
+            }
+            catch (err) {
+                throw new Error(err.message);
+            }
+        });
+    }
+    /**
+     * Runs the lint command and returns the command output
+     * @param {string} dir - Directory to run the linter in
+     * @param {string[]} extensions - File extensions which should be linted
+     * @param {string} args - Additional arguments to pass to the linter
+     * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
+     * @param {string} prefix - Prefix to the lint command
+     * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
+     */
+    static lint(dir, extensions, args = '', fix = false, prefix = '') {
+        const extensionsArg = extensions.map(ext => `.${ext}`).join(',');
+        const commandPrefix = prefix || (0, get_npm_bin_command_1.getNpmBinCommand)(dir);
+        return (0, action_1.run)(`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args} "."`, {
+            dir,
+            ignoreErrors: true
+        });
+    }
+    /**
+     * Parses the output of the lint command. Determines the success of the lint process and the
+     * severity of the identified code style violations
+     * @param {string} dir - Directory in which the linter has been run
+     * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
+     * @returns {LintResult} - Parsed lint result
+     */
+    static parseOutput(dir, output) {
+        const lintResult = (0, lint_result_1.initLintResult)();
+        lintResult.isSuccess = output.status === 0;
+        let outputJson;
+        try {
+            outputJson = JSON.parse(output.stdout);
+        }
+        catch (err) {
+            throw Error(`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`);
+        }
+        for (const violation of outputJson) {
+            const { filePath, messages } = violation;
+            const path = filePath.substring(dir.length + 1);
+            for (const msg of messages) {
+                const { fatal, line, message, ruleId, severity } = msg;
+                // Exit if a fatal ESLint error occurred
+                if (fatal) {
+                    throw Error(`${this.name} Lint error: ${message}`);
+                }
+                const entry = {
+                    path,
+                    firstLine: line,
+                    lastLine: line,
+                    message: `${(0, string_1.removeTrailingPeriod)(message)} (${ruleId})`
+                };
+                if (severity === 1) {
+                    lintResult.warning.push(entry);
+                }
+                else if (severity === 2) {
+                    lintResult.error.push(entry);
+                }
+            }
+        }
+        return lintResult;
+    }
+}
+exports["default"] = WPScriptsLintMDJS;
+
+
+/***/ }),
+
+/***/ 881:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const command_exists_1 = __importDefault(__nccwpck_require__(416));
+const get_npm_bin_command_1 = __nccwpck_require__(559);
+const lint_result_1 = __nccwpck_require__(735);
+const action_1 = __nccwpck_require__(194);
+/** @typedef {import('../utils/lint-result').LintResult} LintResult */
+/**
+ * https://stylelint.io
+ */
+class WPScriptsLintStyle {
+    static get name() {
+        return 'WP-Scripts Lint Style';
+    }
+    /**
+     * Verifies that all required programs are installed. Throws an error if programs are missing
+     * @param {string} dir - Directory to run the linting program in
+     * @param {string} prefix - Prefix to the lint command
+     */
+    static verifySetup(dir, prefix = '') {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Verify that NPM is installed (required to execute stylelint)
+            if (!(yield (0, command_exists_1.default)('npm'))) {
+                throw new Error('NPM is not installed');
+            }
+            // Verify that wp-scripts is installed
+            const commandPrefix = prefix || (0, get_npm_bin_command_1.getNpmBinCommand)(dir);
+            try {
+                (0, action_1.run)(`${commandPrefix} wp-scripts lint-style -v`, { dir });
+            }
+            catch (err) {
+                throw new Error(err.message);
+            }
+        });
+    }
+    /**
+     * Runs the lint-style command and returns the command output
+     * @param {string} dir - Directory to run the linter in
+     * @param {string[]} extensions - File extensions which should be linted
+     * @param {string} args - Additional arguments to pass to the linter
+     * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
+     * @param {string} prefix - Prefix to the lint command
+     * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
+     */
+    static lint(dir, extensions, args = '', fix = false, prefix = '') {
+        const files = extensions.length === 1
+            ? `**/*.${extensions[0]}`
+            : `**/*.{${extensions.join(',')}}`;
+        const fixArg = fix ? '--fix' : '';
+        const commandPrefix = prefix || (0, get_npm_bin_command_1.getNpmBinCommand)(dir);
+        return (0, action_1.run)(`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`, {
+            dir,
+            ignoreErrors: true
+        });
+    }
+    /**
+     * Parses the output of the lint command. Determines the success of the lint process and the
+     * severity of the identified code style violations
+     * @param {string} dir - Directory in which the linter has been run
+     * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
+     * @returns {LintResult} - Parsed lint result
+     */
+    static parseOutput(dir, output) {
+        const lintResult = (0, lint_result_1.initLintResult)();
+        lintResult.isSuccess = output.status === 0;
+        let outputJson;
+        try {
+            outputJson = JSON.parse(output.stdout);
+        }
+        catch (err) {
+            throw Error(`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`);
+        }
+        for (const violation of outputJson) {
+            const { source, warnings } = violation;
+            const path = source.substring(dir.length + 1);
+            for (const warning of warnings) {
+                const { line, severity, text } = warning;
+                if (severity in lintResult) {
+                    lintResult[severity].push({
+                        path,
+                        firstLine: line,
+                        lastLine: line,
+                        message: text
+                    });
+                }
+            }
+        }
+        return lintResult;
+    }
+}
+exports["default"] = WPScriptsLintStyle;
+
+
+/***/ }),
+
+/***/ 194:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.run = exports.getEnv = void 0;
+const core_1 = __importDefault(__nccwpck_require__(186));
+const child_process_1 = __nccwpck_require__(81);
+const RUN_OPTIONS_DEFAULTS = { dir: null, ignoreErrors: false, prefix: '' };
+/**
+ * Returns the value for an environment variable. If the variable is required but doesn't have a
+ * value, an error is thrown
+ * @param {string} name - Name of the environment variable
+ * @param {boolean} required - Whether an error should be thrown if the variable doesn't have a
+ * value
+ * @returns {string | null} - Value of the environment variable
+ */
+function getEnv(name, required = false) {
+    const nameUppercase = name.toUpperCase();
+    const value = process.env[nameUppercase];
+    if (value == null) {
+        // Value is either not set (`undefined`) or set to `null`
+        if (required) {
+            throw new Error(`Environment variable "${nameUppercase}" is not defined`);
+        }
+        return null;
+    }
+    return value;
+}
+exports.getEnv = getEnv;
+/**
+ * Executes the provided shell command
+ * @param {string} cmd - Shell command to execute
+ * @param {{dir: string, ignoreErrors: boolean}} [options] - {@see RUN_OPTIONS_DEFAULTS}
+ * @returns {{status: number, stdout: string, stderr: string}} - Output of the shell command
+ */
+function run(cmd, options) {
+    const optionsWithDefaults = Object.assign(Object.assign({}, RUN_OPTIONS_DEFAULTS), options);
+    core_1.default.debug(cmd);
+    try {
+        const stdout = (0, child_process_1.execSync)(cmd, {
+            encoding: 'utf8',
+            cwd: optionsWithDefaults.dir,
+            maxBuffer: 20 * 1024 * 1024
+        });
+        const output = {
+            status: 0,
+            stdout: stdout.trim(),
+            stderr: ''
+        };
+        core_1.default.debug(`Stdout: ${output.stdout}`);
+        return output;
+    }
+    catch (err) {
+        if (optionsWithDefaults.ignoreErrors) {
+            const output = {
+                status: err.status,
+                stdout: err.stdout.trim(),
+                stderr: err.stderr.trim()
+            };
+            core_1.default.debug(`Exit code: ${output.status}`);
+            core_1.default.debug(`Stdout: ${output.stdout}`);
+            core_1.default.debug(`Stderr: ${output.stderr}`);
+            return output;
+        }
+        throw err;
+    }
+}
+exports.run = run;
+
+
+/***/ }),
+
+/***/ 416:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const command_exists_1 = __importDefault(__nccwpck_require__(569));
+/**
+ * Returns whether the provided shell command is available
+ * @param {string} command - Shell command to check for
+ * @returns {Promise<boolean>} - Whether the command is available
+ */
+function commandExists(command) {
+    return __awaiter(this, void 0, void 0, function* () {
+        // The `command-exists` library throws an error if the command is not available. This function
+        // catches these errors and returns a boolean value instead
+        try {
+            yield (0, command_exists_1.default)(command);
+            return true;
+        }
+        catch (error) {
+            return false;
+        }
+    });
+}
+exports["default"] = commandExists;
+
+
+/***/ }),
+
+/***/ 735:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * Lint result object.
+ * @typedef LintResult
+ * @property {boolean} isSuccess Whether the result is success.
+ * @property {object[]} warning Warnings.
+ * @property {object[]} error Errors.
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.initLintResult = exports.getSummary = void 0;
+/**
+ * Returns an object for storing linting results
+ * @returns {LintResult} - Default object
+ */
+function initLintResult() {
+    return {
+        isSuccess: true,
+        warning: [],
+        error: []
+    };
+}
+exports.initLintResult = initLintResult;
+/**
+ * Returns a text summary of the number of issues found when linting
+ * @param {LintResult} lintResult - Parsed linter
+ * output
+ * @returns {string} - Text summary
+ */
+function getSummary(lintResult) {
+    const nrErrors = lintResult.error.length;
+    const nrWarnings = lintResult.warning.length;
+    // Build and log a summary of linting errors/warnings
+    if (nrWarnings > 0 && nrErrors > 0) {
+        return `${nrErrors} error${nrErrors > 1 ? 's' : ''} and ${nrWarnings} warning${nrWarnings > 1 ? 's' : ''}`;
+    }
+    if (nrErrors > 0) {
+        return `${nrErrors} error${nrErrors > 1 ? 's' : ''}`;
+    }
+    if (nrWarnings > 0) {
+        return `${nrWarnings} warning${nrWarnings > 1 ? 's' : ''}`;
+    }
+    return `no issues`;
+}
+exports.getSummary = getSummary;
+
+
+/***/ }),
+
+/***/ 559:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getNpmBinCommand = void 0;
+const use_yarn_1 = __nccwpck_require__(360);
+/**
+ * Returns the NPM or Yarn command ({@see useYarn()}) for executing an NPM binary
+ * @param {string} [pkgRoot] - Package directory (directory where Yarn lockfile would exist)
+ * @returns {string} - NPM/Yarn command for executing the NPM binary. The binary name should be
+ * appended to this command
+ */
+function getNpmBinCommand(pkgRoot) {
+    return (0, use_yarn_1.useYarn)(pkgRoot) ? 'yarn run --silent' : 'npx --no-install';
+}
+exports.getNpmBinCommand = getNpmBinCommand;
+
+
+/***/ }),
+
+/***/ 360:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.useYarn = void 0;
+const fs_1 = __nccwpck_require__(147);
+const path_1 = __nccwpck_require__(17);
+const YARN_LOCK_NAME = 'yarn.lock';
+/**
+ * Determines whether Yarn should be used to execute commands or binaries. This decision is based on
+ * the existence of a Yarn lockfile in the package directory. The distinction between NPM and Yarn
+ * is necessary e.g. for Yarn Plug'n'Play to work
+ * @param {string} [pkgRoot] - Package directory (directory where Yarn lockfile would exist)
+ * @returns {boolean} - Whether Yarn should be used
+ */
+function useYarn(pkgRoot) {
+    // Use an absolute path if `pkgRoot` is specified and a relative one (current directory) otherwise
+    const lockfilePath = pkgRoot ? (0, path_1.join)(pkgRoot, YARN_LOCK_NAME) : YARN_LOCK_NAME;
+    return (0, fs_1.existsSync)(lockfilePath);
+}
+exports.useYarn = useYarn;
+
+
+/***/ }),
+
+/***/ 155:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const https = __importStar(__nccwpck_require__(687));
+/**
+ * Helper function for making HTTP requests
+ * @param {string | URL} url - Request URL
+ * @param {object} options - Request options
+ * @returns {Promise<object>} - JSON response
+ */
+function request(url, options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve, reject) => {
+            const req = https
+                .request(url, options, res => {
+                let data = '';
+                res.on('data', chunk => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    if (res.statusCode >= 400) {
+                        const err = new Error(`Received status code ${res.statusCode}`);
+                        err.response = res;
+                        err.data = data;
+                        reject(err);
+                    }
+                    else {
+                        resolve({ res, data: JSON.parse(data) });
+                    }
+                });
+            })
+                .on('error', reject);
+            if (options.body) {
+                req.end(JSON.stringify(options.body));
+            }
+            else {
+                req.end();
+            }
+        });
+    });
+}
+exports["default"] = request;
+
+
+/***/ }),
+
+/***/ 743:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.removeTrailingPeriod = exports.capitalizeFirstLetter = void 0;
+/**
+ * Capitalizes the first letter of a string
+ * @param {string} str - String to process
+ * @returns {string} - Input string with first letter capitalized
+ */
+function capitalizeFirstLetter(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+exports.capitalizeFirstLetter = capitalizeFirstLetter;
+/**
+ * Removes the trailing period from the provided string (if it has one)
+ * @param {string} str - String to process
+ * @returns {string} - String without trailing period
+ */
+function removeTrailingPeriod(str) {
+    return str.endsWith('.') ? str.substring(0, str.length - 1) : str;
+}
+exports.removeTrailingPeriod = removeTrailingPeriod;
+
+
+/***/ }),
+
+/***/ 351:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -135,7 +1308,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
-const command_1 = __nccwpck_require__(241);
+const command_1 = __nccwpck_require__(351);
 const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(278);
 const os = __importStar(__nccwpck_require__(37));
@@ -1728,992 +2901,6 @@ exports.debug = debug; // for test
 
 /***/ }),
 
-/***/ 109:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(186);
-
-const { run } = __nccwpck_require__(575);
-
-/** @typedef {import('./github/context').GithubContext} GithubContext */
-
-/**
- * Fetches and checks out the remote Git branch (if it exists, the fork repository will be used)
- * @param {GithubContext} context - Information about the GitHub
- */
-function checkOutRemoteBranch(context) {
-	if (context.repository.hasFork) {
-		// Fork: Add fork repo as remote
-		core.info(`Adding "${context.repository.forkName}" fork as remote with Git`);
-		const cloneURl = new URL(context.repository.forkCloneUrl);
-		cloneURl.username = context.actor;
-		cloneURl.username = context.token;
-		run(`git remote add fork ${cloneURl.toString()}`);
-	} else {
-		// No fork: Update remote URL to include auth information (so auto-fixes can be pushed)
-		core.info(`Adding auth information to Git remote URL`);
-		const cloneURl = new URL(context.repository.cloneUrl);
-		cloneURl.username = context.actor;
-		cloneURl.username = context.token;
-		run(`git remote set-url origin ${cloneURl.toString()}`);
-	}
-
-	const remote = context.repository.hasFork ? "fork" : "origin";
-
-	// Fetch remote branch
-	core.info(`Fetching remote branch "${context.branch}"`);
-	run(`git fetch --no-tags --depth=1 ${remote} ${context.branch}`);
-
-	// Switch to remote branch
-	core.info(`Switching to the "${context.branch}" branch`);
-	run(`git branch --force ${context.branch} --track ${remote}/${context.branch}`);
-	run(`git checkout ${context.branch}`);
-}
-
-/**
- * Stages and commits all changes using Git
- * @param {string} message - Git commit message
- * @param {boolean} skipVerification - Skip Git verification
- */
-function commitChanges(message, skipVerification) {
-	core.info(`Committing changes`);
-	run(`git commit -am "${message}"${skipVerification ? " --no-verify" : ""}`);
-}
-
-/**
- * Returns the SHA of the head commit
- * @returns {string} - Head SHA
- */
-function getHeadSha() {
-	const sha = run("git rev-parse HEAD").stdout;
-	core.info(`SHA of last commit is "${sha}"`);
-	return sha;
-}
-
-/**
- * Checks whether there are differences from HEAD
- * @returns {boolean} - Boolean indicating whether changes exist
- */
-function hasChanges() {
-	const output = run("git diff-index --name-status --exit-code HEAD --", { ignoreErrors: true });
-	const hasChangedFiles = output.status === 1;
-	core.info(`${hasChangedFiles ? "Changes" : "No changes"} found with Git`);
-	return hasChangedFiles;
-}
-
-/**
- * Pushes all changes to the remote repository
- * @param {boolean} skipVerification - Skip Git verification
- */
-function pushChanges(skipVerification) {
-	core.info("Pushing changes with Git");
-	run(`git push${skipVerification ? " --no-verify" : ""}`);
-}
-
-/**
- * Updates the global Git configuration with the provided information
- * @param {string} name - Git username
- * @param {string} email - Git email address
- */
-function setUserInfo(name, email) {
-	core.info(`Setting Git user information`);
-	run(`git config --global user.name "${name}"`);
-	run(`git config --global user.email "${email}"`);
-}
-
-module.exports = {
-	checkOutRemoteBranch,
-	commitChanges,
-	getHeadSha,
-	hasChanges,
-	pushChanges,
-	setUserInfo,
-};
-
-
-/***/ }),
-
-/***/ 872:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(186);
-
-const { name: actionName } = __nccwpck_require__(598);
-const request = __nccwpck_require__(408);
-const { capitalizeFirstLetter } = __nccwpck_require__(321);
-
-/** @typedef {import('./context').GithubContext} GithubContext */
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * Creates a new check on GitHub which annotates the relevant commit with linting errors
- * @param {string} linterName - Name of the linter for which a check should be created
- * @param {string} sha - SHA of the commit which should be annotated
- * @param {GithubContext} context - Information about the GitHub repository and
- * action trigger event
- * @param {LintResult} lintResult - Parsed lint result
- * @param {boolean} neutralCheckOnWarning - Whether the check run should conclude as neutral if
- * there are only warnings
- * @param {string} summary - Summary for the GitHub check
- */
-async function createCheck(linterName, sha, context, lintResult, neutralCheckOnWarning, summary) {
-	let annotations = [];
-	for (const level of ["warning", "error"]) {
-		annotations = [
-			...annotations,
-			...lintResult[level].map((result) => ({
-				path: result.path,
-				start_line: result.firstLine,
-				end_line: result.lastLine,
-				annotation_level: level === "warning" ? "warning" : "failure",
-				message: result.message,
-			})),
-		];
-	}
-
-	// Only use the first 50 annotations (limit for a single API request)
-	if (annotations.length > 50) {
-		core.info(
-			`There are more than 50 errors/warnings from ${linterName}. Annotations are created for the first 50 issues only.`,
-		);
-		annotations = annotations.slice(0, 50);
-	}
-
-	let conclusion;
-	if (lintResult.isSuccess) {
-		if (annotations.length > 0 && neutralCheckOnWarning) {
-			conclusion = "neutral";
-		} else {
-			conclusion = "success";
-		}
-	} else {
-		conclusion = "failure";
-	}
-
-	const body = {
-		name: linterName,
-		head_sha: sha,
-		conclusion,
-		output: {
-			title: capitalizeFirstLetter(summary),
-			summary: `${linterName} found ${summary}`,
-			annotations,
-		},
-	};
-	try {
-		core.info(
-			`Creating GitHub check with ${conclusion} conclusion and ${annotations.length} annotations for ${linterName}…`,
-		);
-		await request(`${process.env.GITHUB_API_URL}/repos/${context.repository.repoName}/check-runs`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				// "Accept" header is required to access Checks API during preview period
-				Accept: "application/vnd.github.antiope-preview+json",
-				Authorization: `Bearer ${context.token}`,
-				"User-Agent": actionName,
-			},
-			body,
-		});
-		core.info(`${linterName} check created successfully`);
-	} catch (err) {
-		core.error(err);
-		throw new Error(`Error trying to create GitHub check for ${linterName}: ${err.message}`);
-	}
-}
-
-module.exports = { createCheck };
-
-
-/***/ }),
-
-/***/ 476:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { readFileSync } = __nccwpck_require__(147);
-
-const core = __nccwpck_require__(186);
-
-const { name: actionName } = __nccwpck_require__(598);
-const { getEnv } = __nccwpck_require__(575);
-
-/**
- * GitHub Actions workflow's environment variables
- * @typedef ActionEnv
- * @property {string} actor Event actor.
- * @property {string} eventName Event name.
- * @property {string} eventPath Event path.
- * @property {string} token Token.
- * @property {string} workspace Workspace path.
- */
-
-/**
- * Information about the GitHub repository and its fork (if it exists)
- * @typedef GithubRepository
- * @property {string} repoName Repo name.
- * @property {string} cloneUrl Repo clone URL.
- * @property {string} forkName Fork name.
- * @property {string} forkCloneUrl Fork repo clone URL.
- * @property {boolean} hasFork Whether repo has a fork.
- */
-
-/**
- * Information about the GitHub repository and action trigger event
- * @typedef GithubContext
- * @property {string} actor Event actor.
- * @property {string} branch Branch name.
- * @property {object} event Event.
- * @property {string} eventName Event name.
- * @property {GithubRepository} repository Information about the GitHub repository
- * @property {string} token Token.
- * @property {string} workspace Workspace path.
- */
-
-/**
- * Returns the GitHub Actions workflow's environment variables
- * @returns {ActionEnv} GitHub Actions workflow's environment variables
- */
-function parseActionEnv() {
-	return {
-		// Information provided by environment
-		actor: getEnv("github_actor", true),
-		eventName: getEnv("github_event_name", true),
-		eventPath: getEnv("github_event_path", true),
-		workspace: getEnv("github_workspace", true),
-
-		// Information provided by action user
-		token: core.getInput("github_token", { required: true }),
-	};
-}
-
-/**
- * Parse `event.json` file (file with the complete webhook event payload, automatically provided by
- * GitHub)
- * @param {string} eventPath - Path to the `event.json` file
- * @returns {object} - Webhook event payload
- */
-function parseEnvFile(eventPath) {
-	const eventBuffer = readFileSync(eventPath);
-	return JSON.parse(eventBuffer);
-}
-
-/**
- * Parses the name of the current branch from the GitHub webhook event
- * @param {string} eventName - GitHub event type
- * @param {object} event - GitHub webhook event payload
- * @returns {string} - Branch name
- */
-function parseBranch(eventName, event) {
-	if (eventName === "push" || eventName === "workflow_dispatch") {
-		return event.ref.substring(11); // Remove "refs/heads/" from start of string
-	}
-	if (eventName === "pull_request" || eventName === "pull_request_target") {
-		return event.pull_request.head.ref;
-	}
-	throw Error(`${actionName} does not support "${eventName}" GitHub events`);
-}
-
-/**
- * Parses the name of the current repository and determines whether it has a corresponding fork.
- * Fork detection is only supported for the "pull_request" event
- * @param {string} eventName - GitHub event type
- * @param {object} event - GitHub webhook event payload
- * @returns {GithubRepository} - Information about the GitHub repository and its fork (if it exists)
- */
-function parseRepository(eventName, event) {
-	const repoName = event.repository.full_name;
-	const cloneUrl = event.repository.clone_url;
-	let forkName;
-	let forkCloneUrl;
-	if (eventName === "pull_request" || eventName === "pull_request_target") {
-		// "pull_request" events are triggered on the repository where the PR is made. The PR branch can
-		// be on the same repository (`forkRepository` is set to `null`) or on a fork (`forkRepository`
-		// is defined)
-		const headRepoName = event.pull_request.head.repo.full_name;
-		forkName = repoName === headRepoName ? undefined : headRepoName;
-		const headForkCloneUrl = event.pull_request.head.repo.clone_url;
-		forkCloneUrl = cloneUrl === headForkCloneUrl ? undefined : headForkCloneUrl;
-	}
-	return {
-		repoName,
-		cloneUrl,
-		forkName,
-		forkCloneUrl,
-		hasFork: forkName != null && forkName !== repoName,
-	};
-}
-
-/**
- * Returns information about the GitHub repository and action trigger event
- * @returns {GithubContext} context - Information about the GitHub repository and action trigger
- * event
- */
-function getContext() {
-	const { actor, eventName, eventPath, token, workspace } = parseActionEnv();
-	const event = parseEnvFile(eventPath);
-	return {
-		actor,
-		branch: parseBranch(eventName, event),
-		event,
-		eventName,
-		repository: parseRepository(eventName, event),
-		token,
-		workspace,
-	};
-}
-
-module.exports = {
-	getContext,
-	parseActionEnv,
-	parseBranch,
-	parseEnvFile,
-	parseRepository,
-};
-
-
-/***/ }),
-
-/***/ 565:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const LintJs = __nccwpck_require__(638);
-const LintMdJs = __nccwpck_require__(11);
-const LintStyle = __nccwpck_require__(430);
-
-const linters = {
-	// Linters
-	lint_js: LintJs,
-	lint_md_js: LintMdJs,
-	lint_style: LintStyle,
-};
-
-module.exports = linters;
-
-
-/***/ }),
-
-/***/ 638:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(575);
-const commandExists = __nccwpck_require__(265);
-const { initLintResult } = __nccwpck_require__(149);
-const { getNpmBinCommand } = __nccwpck_require__(838);
-const { removeTrailingPeriod } = __nccwpck_require__(321);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://eslint.org
- */
-class WPScriptsLintJS {
-	static get name() {
-		return "WP-Scripts Lint JS";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute ESLint)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that WPScripts is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} wp-scripts lint-js -v`, { dir });
-		} catch (err) {
-			throw new Error(err.message);
-		}
-	}
-
-	/**
-	 * Runs the lint command and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const lintArg = fix ? "format" : "lint-js";
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args} "."`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		let outputJson;
-		try {
-			outputJson = JSON.parse(output.stdout);
-		} catch (err) {
-			throw Error(
-				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
-			);
-		}
-
-		for (const violation of outputJson) {
-			const { filePath, messages } = violation;
-			const path = filePath.substring(dir.length + 1);
-
-			for (const msg of messages) {
-				const { fatal, line, message, ruleId, severity } = msg;
-
-				// Exit if a fatal ESLint error occurred
-				if (fatal) {
-					throw Error(`${this.name} Lint error: ${message}`);
-				}
-
-				const entry = {
-					path,
-					firstLine: line,
-					lastLine: line,
-					message: `${removeTrailingPeriod(message)} (${ruleId})`,
-				};
-				if (severity === 1) {
-					lintResult.warning.push(entry);
-				} else if (severity === 2) {
-					lintResult.error.push(entry);
-				}
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = WPScriptsLintJS;
-
-
-/***/ }),
-
-/***/ 11:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(575);
-const commandExists = __nccwpck_require__(265);
-const { initLintResult } = __nccwpck_require__(149);
-const { getNpmBinCommand } = __nccwpck_require__(838);
-const { removeTrailingPeriod } = __nccwpck_require__(321);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://eslint.org
- */
-class WPScriptsLintMDJS {
-	static get name() {
-		return "WP-Scripts Lint MD JS";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute ESLint)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that WPScripts is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} wp-scripts lint-md-js -v`, { dir });
-		} catch (err) {
-			throw new Error(err.message);
-		}
-	}
-
-	/**
-	 * Runs the lint command and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args} "."`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		let outputJson;
-		try {
-			outputJson = JSON.parse(output.stdout);
-		} catch (err) {
-			throw Error(
-				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
-			);
-		}
-
-		for (const violation of outputJson) {
-			const { filePath, messages } = violation;
-			const path = filePath.substring(dir.length + 1);
-
-			for (const msg of messages) {
-				const { fatal, line, message, ruleId, severity } = msg;
-
-				// Exit if a fatal ESLint error occurred
-				if (fatal) {
-					throw Error(`${this.name} Lint error: ${message}`);
-				}
-
-				const entry = {
-					path,
-					firstLine: line,
-					lastLine: line,
-					message: `${removeTrailingPeriod(message)} (${ruleId})`,
-				};
-				if (severity === 1) {
-					lintResult.warning.push(entry);
-				} else if (severity === 2) {
-					lintResult.error.push(entry);
-				}
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = WPScriptsLintMDJS;
-
-
-/***/ }),
-
-/***/ 430:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(575);
-const commandExists = __nccwpck_require__(265);
-const { initLintResult } = __nccwpck_require__(149);
-const { getNpmBinCommand } = __nccwpck_require__(838);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://stylelint.io
- */
-class WPScriptsLintStyle {
-	static get name() {
-		return "WP-Scripts Lint Style";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute stylelint)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that wp-scripts is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} wp-scripts lint-style -v`, { dir });
-		} catch (err) {
-			throw new Error(err.message);
-		}
-	}
-
-	/**
-	 * Runs the lint-style command and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
-		const fixArg = fix ? "--fix" : "";
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		let outputJson;
-		try {
-			outputJson = JSON.parse(output.stdout);
-		} catch (err) {
-			throw Error(
-				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
-			);
-		}
-
-		for (const violation of outputJson) {
-			const { source, warnings } = violation;
-			const path = source.substring(dir.length + 1);
-			for (const warning of warnings) {
-				const { line, severity, text } = warning;
-				if (severity in lintResult) {
-					lintResult[severity].push({
-						path,
-						firstLine: line,
-						lastLine: line,
-						message: text,
-					});
-				}
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = WPScriptsLintStyle;
-
-
-/***/ }),
-
-/***/ 575:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { execSync } = __nccwpck_require__(81);
-
-const core = __nccwpck_require__(186);
-
-const RUN_OPTIONS_DEFAULTS = { dir: null, ignoreErrors: false, prefix: "" };
-
-/**
- * Returns the value for an environment variable. If the variable is required but doesn't have a
- * value, an error is thrown
- * @param {string} name - Name of the environment variable
- * @param {boolean} required - Whether an error should be thrown if the variable doesn't have a
- * value
- * @returns {string | null} - Value of the environment variable
- */
-function getEnv(name, required = false) {
-	const nameUppercase = name.toUpperCase();
-	const value = process.env[nameUppercase];
-	if (value == null) {
-		// Value is either not set (`undefined`) or set to `null`
-		if (required) {
-			throw new Error(`Environment variable "${nameUppercase}" is not defined`);
-		}
-		return null;
-	}
-	return value;
-}
-
-/**
- * Executes the provided shell command
- * @param {string} cmd - Shell command to execute
- * @param {{dir: string, ignoreErrors: boolean}} [options] - {@see RUN_OPTIONS_DEFAULTS}
- * @returns {{status: number, stdout: string, stderr: string}} - Output of the shell command
- */
-function run(cmd, options) {
-	const optionsWithDefaults = {
-		...RUN_OPTIONS_DEFAULTS,
-		...options,
-	};
-
-	core.debug(cmd);
-
-	try {
-		const stdout = execSync(cmd, {
-			encoding: "utf8",
-			cwd: optionsWithDefaults.dir,
-			maxBuffer: 20 * 1024 * 1024,
-		});
-		const output = {
-			status: 0,
-			stdout: stdout.trim(),
-			stderr: "",
-		};
-
-		core.debug(`Stdout: ${output.stdout}`);
-
-		return output;
-	} catch (err) {
-		if (optionsWithDefaults.ignoreErrors) {
-			const output = {
-				status: err.status,
-				stdout: err.stdout.trim(),
-				stderr: err.stderr.trim(),
-			};
-
-			core.debug(`Exit code: ${output.status}`);
-			core.debug(`Stdout: ${output.stdout}`);
-			core.debug(`Stderr: ${output.stderr}`);
-
-			return output;
-		}
-		throw err;
-	}
-}
-
-module.exports = {
-	getEnv,
-	run,
-};
-
-
-/***/ }),
-
-/***/ 265:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const checkForCommand = __nccwpck_require__(569);
-
-/**
- * Returns whether the provided shell command is available
- * @param {string} command - Shell command to check for
- * @returns {Promise<boolean>} - Whether the command is available
- */
-async function commandExists(command) {
-	// The `command-exists` library throws an error if the command is not available. This function
-	// catches these errors and returns a boolean value instead
-	try {
-		await checkForCommand(command);
-		return true;
-	} catch (error) {
-		return false;
-	}
-}
-
-module.exports = commandExists;
-
-
-/***/ }),
-
-/***/ 149:
-/***/ ((module) => {
-
-/**
- * Lint result object.
- * @typedef LintResult
- * @property {boolean} isSuccess Whether the result is success.
- * @property {object[]} warning Warnings.
- * @property {object[]} error Errors.
- */
-
-/**
- * Returns an object for storing linting results
- * @returns {LintResult} - Default object
- */
-function initLintResult() {
-	return {
-		isSuccess: true, // Usually determined by the exit code of the linting command
-		warning: [],
-		error: [],
-	};
-}
-
-/**
- * Returns a text summary of the number of issues found when linting
- * @param {LintResult} lintResult - Parsed linter
- * output
- * @returns {string} - Text summary
- */
-function getSummary(lintResult) {
-	const nrErrors = lintResult.error.length;
-	const nrWarnings = lintResult.warning.length;
-	// Build and log a summary of linting errors/warnings
-	if (nrWarnings > 0 && nrErrors > 0) {
-		return `${nrErrors} error${nrErrors > 1 ? "s" : ""} and ${nrWarnings} warning${
-			nrWarnings > 1 ? "s" : ""
-		}`;
-	}
-	if (nrErrors > 0) {
-		return `${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
-	}
-	if (nrWarnings > 0) {
-		return `${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
-	}
-	return `no issues`;
-}
-
-module.exports = {
-	getSummary,
-	initLintResult,
-};
-
-
-/***/ }),
-
-/***/ 838:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { useYarn } = __nccwpck_require__(753);
-
-/**
- * Returns the NPM or Yarn command ({@see useYarn()}) for executing an NPM binary
- * @param {string} [pkgRoot] - Package directory (directory where Yarn lockfile would exist)
- * @returns {string} - NPM/Yarn command for executing the NPM binary. The binary name should be
- * appended to this command
- */
-function getNpmBinCommand(pkgRoot) {
-	return useYarn(pkgRoot) ? "yarn run --silent" : "npx --no-install";
-}
-
-module.exports = { getNpmBinCommand };
-
-
-/***/ }),
-
-/***/ 753:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { existsSync } = __nccwpck_require__(147);
-const { join } = __nccwpck_require__(17);
-
-const YARN_LOCK_NAME = "yarn.lock";
-
-/**
- * Determines whether Yarn should be used to execute commands or binaries. This decision is based on
- * the existence of a Yarn lockfile in the package directory. The distinction between NPM and Yarn
- * is necessary e.g. for Yarn Plug'n'Play to work
- * @param {string} [pkgRoot] - Package directory (directory where Yarn lockfile would exist)
- * @returns {boolean} - Whether Yarn should be used
- */
-function useYarn(pkgRoot) {
-	// Use an absolute path if `pkgRoot` is specified and a relative one (current directory) otherwise
-	const lockfilePath = pkgRoot ? join(pkgRoot, YARN_LOCK_NAME) : YARN_LOCK_NAME;
-	return existsSync(lockfilePath);
-}
-
-module.exports = { useYarn };
-
-
-/***/ }),
-
-/***/ 408:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const https = __nccwpck_require__(687);
-
-/**
- * Helper function for making HTTP requests
- * @param {string | URL} url - Request URL
- * @param {object} options - Request options
- * @returns {Promise<object>} - JSON response
- */
-function request(url, options) {
-	return new Promise((resolve, reject) => {
-		const req = https
-			.request(url, options, (res) => {
-				let data = "";
-				res.on("data", (chunk) => {
-					data += chunk;
-				});
-				res.on("end", () => {
-					if (res.statusCode >= 400) {
-						const err = new Error(`Received status code ${res.statusCode}`);
-						err.response = res;
-						err.data = data;
-						reject(err);
-					} else {
-						resolve({ res, data: JSON.parse(data) });
-					}
-				});
-			})
-			.on("error", reject);
-		if (options.body) {
-			req.end(JSON.stringify(options.body));
-		} else {
-			req.end();
-		}
-	});
-}
-
-module.exports = request;
-
-
-/***/ }),
-
-/***/ 321:
-/***/ ((module) => {
-
-/**
- * Capitalizes the first letter of a string
- * @param {string} str - String to process
- * @returns {string} - Input string with first letter capitalized
- */
-function capitalizeFirstLetter(str) {
-	return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-/**
- * Removes the trailing period from the provided string (if it has one)
- * @param {string} str - String to process
- * @returns {string} - String without trailing period
- */
-function removeTrailingPeriod(str) {
-	return str[str.length - 1] === "." ? str.substring(0, str.length - 1) : str;
-}
-
-module.exports = {
-	capitalizeFirstLetter,
-	removeTrailingPeriod,
-};
-
-
-/***/ }),
-
 /***/ 491:
 /***/ ((module) => {
 
@@ -2806,7 +2993,7 @@ module.exports = require("util");
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse('{"name":"lint-action","version":"1.10.0","description":"GitHub Action for detecting and fixing linting errors","author":{"name":"Samuel Meuli","email":"me@samuelmeuli.com","url":"https://sixa.ch/"},"repository":"github:sixach/wpscripts-lint-action","license":"MIT","private":true,"main":"./dist/index.js","scripts":{"test":"jest","lint":"eslint --max-warnings 0 \\"**/*.js\\"","lint:fix":"yarn lint --fix","format":"prettier --list-different \\"**/*.{css,html,js,json,jsx,less,md,scss,ts,tsx,vue,yaml,yml}\\"","format:fix":"yarn format --write","build":"ncc build ./src/index.js"},"dependencies":{"@actions/core":"^1.6.0","command-exists":"^1.2.9","parse-diff":"^0.8.1"},"peerDependencies":{},"devDependencies":{"@samuelmeuli/eslint-config":"^6.0.0","@samuelmeuli/prettier-config":"^2.0.1","@vercel/ncc":"^0.33.0","eslint":"7.32.0","eslint-config-airbnb-base":"15.0.0","eslint-config-prettier":"^8.3.0","eslint-plugin-import":"^2.25.3","eslint-plugin-jsdoc":"^37.2.0","fs-extra":"^10.0.0","jest":"^27.4.3","prettier":"^2.5.1"},"eslintConfig":{"root":true,"extends":["@samuelmeuli/eslint-config","plugin:jsdoc/recommended"],"env":{"node":true,"jest":true},"settings":{"jsdoc":{"mode":"typescript"}},"rules":{"no-await-in-loop":"off","no-unused-vars":["error",{"args":"none","varsIgnorePattern":"^_"}],"jsdoc/check-indentation":"error","jsdoc/check-syntax":"error","jsdoc/newline-after-description":["error","never"],"jsdoc/require-description":"error","jsdoc/require-hyphen-before-param-description":"error","jsdoc/require-jsdoc":"off"}},"eslintIgnore":["node_modules/","test/linters/projects/","test/tmp/","dist/"],"jest":{"globalSetup":"./test/setup.js","globalTeardown":"./test/teardown.js"},"prettier":"@samuelmeuli/prettier-config"}');
+module.exports = JSON.parse('{"name":"wpscripts-lint-action","version":"1.0.0","description":"GitHub Action for detecting and fixing linting errors","author":{"name":"Sixa","email":"info@sixa.ch","url":"https://sixa.ch/"},"keywords":["actions","node","lint","wordpress","wp-scripts"],"repository":"github:sixach/wpscripts-lint-action","license":"MIT","private":true,"main":"./lib/index.js","scripts":{"test":"jest","lint":"eslint src/**/*.ts","format":"prettier --check \'**/*.ts\'","format:fix":"prettier --write \'**/*.ts\'","build":"tsc","package":"ncc build --source-map --license licenses.txt","all":"npm run build && npm run format:fix && npm run lint && npm run package && npm test"},"dependencies":{"@actions/core":"^1.6.0","command-exists":"^1.2.9","parse-diff":"^0.9.0"},"devDependencies":{"@types/command-exists":"^1.2.0","@types/jest":"^27.0.3","@vercel/ncc":"^0.33.1","eslint":"^8.5.0","eslint-plugin-github":"^4.3.5","eslint-plugin-import":"^2.25.3","eslint-plugin-jest":"^25.3.0","eslint-plugin-jsdoc":"^37.4.0","fs-extra":"^10.0.0","jest":"^27.4.5","prettier":"^2.5.1","ts-jest":"^27.1.2","typescript":"^4.5.4"},"jest":{"globalSetup":"./test/setup.ts","globalTeardown":"./test/teardown.ts"}}');
 
 /***/ })
 
@@ -2848,153 +3035,13 @@ module.exports = JSON.parse('{"name":"lint-action","version":"1.10.0","descripti
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
 /******/ 	
 /************************************************************************/
-var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
-(() => {
-const { join } = __nccwpck_require__(17);
-
-const core = __nccwpck_require__(186);
-
-const git = __nccwpck_require__(109);
-const { createCheck } = __nccwpck_require__(872);
-const { getContext } = __nccwpck_require__(476);
-const linters = __nccwpck_require__(565);
-const { getSummary } = __nccwpck_require__(149);
-
-/**
- * Parses the action configuration and runs all enabled linters on matching files
- */
-async function runAction() {
-	const context = getContext();
-	const autoFix = core.getInput("auto_fix") === "true";
-	const skipVerification = core.getInput("git_no_verify") === "true";
-	const continueOnError = core.getInput("continue_on_error") === "true";
-	const gitName = core.getInput("git_name", { required: true });
-	const gitEmail = core.getInput("git_email", { required: true });
-	const commitMessage = core.getInput("commit_message", { required: true });
-	const checkName = core.getInput("check_name", { required: true });
-	const neutralCheckOnWarning = core.getInput("neutral_check_on_warning") === "true";
-	const isPullRequest =
-		context.eventName === "pull_request" || context.eventName === "pull_request_target";
-
-	// If on a PR from fork: Display messages regarding action limitations
-	if (isPullRequest && context.repository.hasFork) {
-		core.error(
-			"This action does not have permission to create annotations on forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
-		);
-		if (autoFix) {
-			core.error(
-				"This action does not have permission to push to forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
-			);
-		}
-	}
-
-	if (autoFix) {
-		// Set Git committer username and password
-		git.setUserInfo(gitName, gitEmail);
-	}
-	if (isPullRequest) {
-		// Fetch and check out PR branch:
-		// - "push" event: Already on correct branch
-		// - "pull_request" event on origin, for code on origin: The Checkout Action
-		//   (https://github.com/actions/checkout) checks out the PR's test merge commit instead of the
-		//   PR branch. Git is therefore in detached head state. To be able to push changes, the branch
-		//   needs to be fetched and checked out first
-		// - "pull_request" event on origin, for code on fork: Same as above, but the repo/branch where
-		//   changes need to be pushed is not yet available. The fork needs to be added as a Git remote
-		//   first
-		git.checkOutRemoteBranch(context);
-	}
-
-	let headSha = git.getHeadSha();
-
-	let hasFailures = false;
-	const checks = [];
-
-	// Loop over all available linters
-	for (const [linterId, linter] of Object.entries(linters)) {
-		// Determine whether the linter should be executed on the commit
-		if (core.getInput(linterId) === "true") {
-			core.startGroup(`Run ${linter.name}`);
-
-			const fileExtensions = core.getInput(`${linterId}_extensions`, { required: true });
-			const args = core.getInput(`${linterId}_args`);
-			const lintDirRel = core.getInput(`${linterId}_dir`) || ".";
-			const prefix = core.getInput(`${linterId}_command_prefix`);
-			const lintDirAbs = join(context.workspace, lintDirRel);
-
-			// Check that the linter and its dependencies are installed
-			core.info(`Verifying setup for ${linter.name}…`);
-			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`Verified ${linter.name} setup`);
-
-			// Determine which files should be linted
-			const fileExtList = fileExtensions.split(",");
-			core.info(`Will use ${linter.name} to check the files with extensions ${fileExtList}`);
-
-			// Lint and optionally auto-fix the matching files, parse code style violations
-			core.info(
-				`Linting ${autoFix ? "and auto-fixing " : ""}files in ${lintDirAbs} with ${linter.name}…`,
-			);
-			const lintOutput = linter.lint(lintDirAbs, fileExtList, args, autoFix, prefix);
-
-			// Parse output of linting command
-			const lintResult = linter.parseOutput(context.workspace, lintOutput);
-			const summary = getSummary(lintResult);
-			core.info(
-				`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
-			);
-
-			if (!lintResult.isSuccess) {
-				hasFailures = true;
-			}
-
-			if (autoFix) {
-				// Commit and push auto-fix changes
-				if (git.hasChanges()) {
-					git.commitChanges(commitMessage.replace(/\${linter}/g, linter.name), skipVerification);
-					git.pushChanges(skipVerification);
-				}
-			}
-
-			const lintCheckName = checkName
-				.replace(/\${linter}/g, linter.name)
-				.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
-				.trim();
-
-			checks.push({ lintCheckName, lintResult, summary });
-
-			core.endGroup();
-		}
-	}
-
-	// Add commit annotations after running all linters. To be displayed on pull requests, the
-	// annotations must be added to the last commit on the branch. This can either be a user commit or
-	// one of the auto-fix commits
-	if (isPullRequest && autoFix) {
-		headSha = git.getHeadSha();
-	}
-
-	core.startGroup("Create check runs with commit annotations");
-	await Promise.all(
-		checks.map(({ lintCheckName, lintResult, summary }) =>
-			createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
-		),
-	);
-	core.endGroup();
-
-	if (hasFailures && !continueOnError) {
-		core.setFailed("Linting failures detected. See check runs with annotations for details.");
-	}
-}
-
-runAction().catch((error) => {
-	core.debug(error.stack || "No error stack trace");
-	core.setFailed(error.message);
-});
-
-})();
-
-module.exports = __webpack_exports__;
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module is referenced by other modules so it can't be inlined
+/******/ 	var __webpack_exports__ = __nccwpck_require__(822);
+/******/ 	module.exports = __webpack_exports__;
+/******/ 	
 /******/ })()
 ;
+//# sourceMappingURL=index.js.map
