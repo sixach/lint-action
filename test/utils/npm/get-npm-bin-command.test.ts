@@ -1,5 +1,5 @@
-const {getNpmBinCommand} = require('../../../src/utils/npm/get-npm-bin-command')
-const {useYarn} = require('../../../src/utils/npm/use-yarn')
+import {getNpmBinCommand} from '../../../src/utils/npm/get-npm-bin-command'
+import {useYarn} from '../../../src/utils/npm/use-yarn'
 
 jest.mock('../../../src/utils/action')
 jest.mock('../../../src/utils/npm/use-yarn')

@@ -1,10 +1,10 @@
-const {mkdir} = require('fs').promises
-const {join} = require('path')
+import {mkdir} from 'fs/promises'
+import {join} from 'path'
 
-const {ensureFile, remove} = require('fs-extra')
+import {ensureFile, remove} from 'fs-extra'
 
-const {useYarn} = require('../../../src/utils/npm/use-yarn')
-const {createTmpDir} = require('../../test-utils')
+import {useYarn} from '../../../src/utils/npm/use-yarn'
+import {createTmpDir} from '../../test-utils'
 
 const tmpDir = createTmpDir()
 

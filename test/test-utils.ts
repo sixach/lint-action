@@ -8,7 +8,7 @@ const TEST_DATE = '2019-01-01 00:00:00.000000 +0000'
  * Creates a temporary directory.
  * @returns {string} - File path
  */
-function createTmpDir() {
+function createTmpDir(): string {
   return mkdtempSync(join(__dirname, 'tmp-'))
 }
 
@@ -18,7 +18,7 @@ function createTmpDir() {
  * @param {...string} paths - Paths to join
  * @returns {string} - File path
  */
-function joinDoubleBackslash(...paths) {
+function joinDoubleBackslash(...paths: string[]): string {
   let filePath = join(...paths)
   if (process.platform === 'win32') {
     filePath = filePath.replace(/\\/g, '\\\\')
@@ -33,7 +33,7 @@ function joinDoubleBackslash(...paths) {
  * @param {string} path - Which path should be replaced
  * @returns {string} - Normalized paths
  */
-function normalizePaths(str, path) {
+function normalizePaths(str: string, path: string): string {
   const pathToSearch = realpathSync(path)
   const pathToSearchEscaped = pathToSearch.replace(
     /[-/\\^$*+?.()|[\]{}]/g,
@@ -47,7 +47,7 @@ function normalizePaths(str, path) {
  * @param {string} str - String in which dates should be replaced
  * @returns {string} - Normalized date
  */
-function normalizeDates(str) {
+function normalizeDates(str: string): string {
   return str.replace(DATE_REGEX, TEST_DATE)
 }
 
