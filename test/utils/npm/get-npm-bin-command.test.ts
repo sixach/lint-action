@@ -6,13 +6,13 @@ jest.mock('../../../src/utils/npm/use-yarn')
 
 describe('runNpmBin()', () => {
   test('should run correct Yarn command', () => {
-    useYarn.mockReturnValue(true)
+    ;(useYarn as jest.Mock).mockReturnValue(true)
     const npmBinCommand = getNpmBinCommand('/this/path/is/not/used')
     expect(npmBinCommand).toEqual('yarn run --silent')
   })
 
   test('should run correct NPM command', () => {
-    useYarn.mockReturnValue(false)
+    ;(useYarn as jest.Mock).mockReturnValue(false)
     const npmBinCommand = getNpmBinCommand('/this/path/is/not/used')
     expect(npmBinCommand).toEqual('npx --no-install')
   })
