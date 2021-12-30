@@ -2142,10 +2142,10 @@ class WPScriptsLintJS {
 	 */
 	static lint(dir, extensions, args = "", fix = false, prefix = "") {
 		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const lintArg = fix ? "format" : "lint-js";
+		const lintArg = fix ? "format" : "lint-js --format json";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args} "."`,
+			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -2260,7 +2260,7 @@ class WPScriptsLintMDJS {
 		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args} "."`,
+			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -2866,7 +2866,7 @@ const { getSummary } = __nccwpck_require__(149);
  */
 async function runAction() {
 	const context = getContext();
-	const autoFix = core.getInput("auto_fix") === "true";
+	const fixMode = core.getInput("fix_mode") === "true";
 	const skipVerification = core.getInput("git_no_verify") === "true";
 	const continueOnError = core.getInput("continue_on_error") === "true";
 	const gitName = core.getInput("git_name", { required: true });
@@ -2880,16 +2880,16 @@ async function runAction() {
 	// If on a PR from fork: Display messages regarding action limitations
 	if (isPullRequest && context.repository.hasFork) {
 		core.error(
-			"This action does not have permission to create annotations on forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
+			"This action does not have permission to create annotations on forks. You may want to run it only on `push` events.",
 		);
-		if (autoFix) {
+		if (fixMode) {
 			core.error(
-				"This action does not have permission to push to forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
+				"This action does not have permission to push to forks. You may want to run it only on `push` events.",
 			);
 		}
 	}
 
-	if (autoFix) {
+	if (fixMode) {
 		// Set Git committer username and password
 		git.setUserInfo(gitName, gitEmail);
 	}
@@ -2934,35 +2934,38 @@ async function runAction() {
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`Linting ${autoFix ? "and auto-fixing " : ""}files in ${lintDirAbs} with ${linter.name}…`,
-			);
-			const lintOutput = linter.lint(lintDirAbs, fileExtList, args, autoFix, prefix);
-
-			// Parse output of linting command
-			const lintResult = linter.parseOutput(context.workspace, lintOutput);
-			const summary = getSummary(lintResult);
-			core.info(
-				`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
+				`${fixMode ? "Fixing" : "Linting"} files in ${lintDirAbs} with ${linter.name}…`,
 			);
 
-			if (!lintResult.isSuccess) {
-				hasFailures = true;
+			if (!fixMode) {
+				const lintOutput = linter.lint(lintDirAbs, fileExtList, args, fixMode, prefix);
+
+				// Parse output of linting command
+				const lintResult = linter.parseOutput(context.workspace, lintOutput);
+				const summary = getSummary(lintResult);
+				core.info(
+					`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
+				);
+	
+				if (!lintResult.isSuccess) {
+					hasFailures = true;
+				}
+
+				const lintCheckName = checkName
+					.replace(/\${linter}/g, linter.name)
+					.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
+					.trim();
+
+				checks.push({ lintCheckName, lintResult, summary });
 			}
 
-			if (autoFix) {
+			if (fixMode) {
 				// Commit and push auto-fix changes
 				if (git.hasChanges()) {
 					git.commitChanges(commitMessage.replace(/\${linter}/g, linter.name), skipVerification);
 					git.pushChanges(skipVerification);
 				}
 			}
-
-			const lintCheckName = checkName
-				.replace(/\${linter}/g, linter.name)
-				.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
-				.trim();
-
-			checks.push({ lintCheckName, lintResult, summary });
 
 			core.endGroup();
 		}
@@ -2971,20 +2974,22 @@ async function runAction() {
 	// Add commit annotations after running all linters. To be displayed on pull requests, the
 	// annotations must be added to the last commit on the branch. This can either be a user commit or
 	// one of the auto-fix commits
-	if (isPullRequest && autoFix) {
+	if (isPullRequest && fixMode) {
 		headSha = git.getHeadSha();
 	}
 
-	core.startGroup("Create check runs with commit annotations");
-	await Promise.all(
-		checks.map(({ lintCheckName, lintResult, summary }) =>
-			createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
-		),
-	);
-	core.endGroup();
-
-	if (hasFailures && !continueOnError) {
-		core.setFailed("Linting failures detected. See check runs with annotations for details.");
+	if (!fixMode) {
+		core.startGroup("Create check runs with commit annotations");
+		await Promise.all(
+			checks.map(({ lintCheckName, lintResult, summary }) =>
+				createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
+			),
+		);
+		core.endGroup();
+		
+		if (hasFailures && !continueOnError) {
+			core.setFailed("Linting failures detected. See check runs with annotations for details.");
+		}
 	}
 }
 

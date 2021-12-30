@@ -11,7 +11,7 @@ inputs:
     description: Whether the workflow run should also fail when linter failures are detected
     required: false
     default: "true"
-  auto_fix:
+  fix_mode:
     description: Whether linters should try to fix code style issues automatically
     required: false
     default: "false"

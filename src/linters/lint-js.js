@@ -45,10 +45,10 @@ class WPScriptsLintJS {
 	 */
 	static lint(dir, extensions, args = "", fix = false, prefix = "") {
 		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const lintArg = fix ? "format" : "lint-js";
+		const lintArg = fix ? "format" : "lint-js --format json";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color --format json ${args}`,
+			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
