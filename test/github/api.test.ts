@@ -1,5 +1,5 @@
-const {createCheck} = require('../../src/github/api')
-const {
+import {createCheck} from '../../src/github/api'
+import {
   EVENT_NAME,
   EVENT_PATH,
   FORK_REPOSITORY,
@@ -7,7 +7,7 @@ const {
   REPOSITORY_DIR,
   TOKEN,
   USERNAME
-} = require('./test-constants')
+} from './test-constants'
 
 jest.mock('../../src/utils/request', () =>
   // eslint-disable-next-line global-require

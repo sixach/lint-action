@@ -13,7 +13,7 @@ const TOKEN = 'test-token'
 const EVENT_NAME = 'push'
 const EVENT_PATH = '/path/to/event.json'
 
-module.exports = {
+export {
   USERNAME,
   REPOSITORY_NAME,
   REPOSITORY,

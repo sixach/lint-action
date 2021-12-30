@@ -1,15 +1,15 @@
-const {join} = require('path')
+import {join} from 'path'
 
-const {
+import {
   parseActionEnv,
   parseBranch,
   parseEnvFile,
   parseRepository
-} = require('../../src/github/context')
-const prOpenEvent = require('./events/pull-request-open.json')
-const prSyncEvent = require('./events/pull-request-sync.json')
-const pushEvent = require('./events/push.json')
-const {
+} from '../../src/github/context'
+import prOpenEvent from './events/pull-request-open.json'
+import prSyncEvent from './events/pull-request-sync.json'
+import pushEvent from './events/push.json'
+import {
   BRANCH,
   EVENT_NAME,
   EVENT_PATH,
@@ -18,7 +18,7 @@ const {
   REPOSITORY_DIR,
   TOKEN,
   USERNAME
-} = require('./test-constants')
+} from './test-constants'
 
 const invalidEventPath = '/path/to/invalid/event.json'
 const prOpenEventPath = join(__dirname, 'events', 'pull-request-open.json')
