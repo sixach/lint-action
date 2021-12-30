@@ -2073,14 +2073,97 @@ module.exports = {
 
 /***/ }),
 
+/***/ 913:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const { run } = __nccwpck_require__(575);
+const commandExists = __nccwpck_require__(265);
+const { initLintResult } = __nccwpck_require__(149);
+const { getNpmBinCommand } = __nccwpck_require__(838);
+
+/** @typedef {import('../utils/lint-result').LintResult} LintResult */
+
+/**
+ * It helps to enforce coding style guidelines for files (JavaScript, YAML) by formatting
+ * source code in a consistent way.
+ */
+class WPScriptsFormat {
+	static get name() {
+		return "WP-Scripts Format";
+	}
+
+	/**
+	 * Verifies that all required programs are installed. Throws an error if programs are missing
+	 * @param {string} dir - Directory to run the linting program in
+	 * @param {string} prefix - Prefix to the format command
+	 */
+	static async verifySetup(dir, prefix = "") {
+		// Verify that NPM is installed (required to execute ESLint)
+		if (!(await commandExists("npm"))) {
+			throw new Error("NPM is not installed");
+		}
+
+		// Verify that WPScripts is installed
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		try {
+      // Format doesn't have any flags, run lint-js instead
+			run(`${commandPrefix} wp-scripts lint-js -v`, { dir });
+		} catch (err) {
+			throw new Error(err.message);
+		}
+	}
+
+	/**
+	 * Runs the lint command and returns the command output
+	 * @param {string} dir - Directory to run the linter in
+	 * @param {string[]} extensions - Dummy variable for compatibility
+	 * @param {string} args - Additional arguments to pass to the linter
+   * @param {boolean} fix - Dummy variable for compatibility
+	 * @param {string} prefix - Prefix to the lint command
+	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
+	 */
+	static lint(dir, extensions, args = "", fix = false, prefix = "") {
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		return run(
+			`${commandPrefix} wp-scripts format ${args}`,
+			{
+				dir,
+				ignoreErrors: true,
+			},
+		);
+	}
+
+	/**
+	 * Parses the output of the lint command. Determines the success of the lint process and the
+	 * severity of the identified code style violations
+	 * @param {string} dir - Directory in which the linter has been run
+	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
+	 * @returns {LintResult} - Parsed lint result
+	 */
+	static parseOutput(dir, output) {
+		const lintResult = initLintResult();
+		lintResult.isSuccess = output.status === 0;
+
+		return false
+	}
+}
+
+module.exports = WPScriptsFormat;
+
+
+/***/ }),
+
 /***/ 565:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
+const Format = __nccwpck_require__(913)
 const LintJs = __nccwpck_require__(638);
 const LintMdJs = __nccwpck_require__(11);
 const LintStyle = __nccwpck_require__(430);
 
 const linters = {
+	// Format
+	format: Format,
 	// Linters
 	lint_js: LintJs,
 	lint_md_js: LintMdJs,
@@ -2142,10 +2225,9 @@ class WPScriptsLintJS {
 	 */
 	static lint(dir, extensions, args = "", fix = false, prefix = "") {
 		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const lintArg = fix ? "format" : "lint-js --format json";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts ${lintArg} --ext ${extensionsArg} --no-color ${args}`,
+			`${commandPrefix} wp-scripts lint-js --format json --ext ${extensionsArg} --no-color ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
