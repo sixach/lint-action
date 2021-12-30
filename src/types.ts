@@ -38,9 +38,10 @@ export interface GithubRepository {
 
 export interface GithubContext {
   actor: string
-  branch: string
+  branch?: string
   event: object
   eventName: string
+  eventPath?: string
   repository: GithubRepository
   token: string
   workspace: string
