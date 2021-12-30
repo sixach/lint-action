@@ -1,10 +1,12 @@
-# ✨ Lint Action
+# ✨ WPScripts Lint Action
 
-- **Shows linting errors** on GitHub commits and PRs
+This is a WordPress linter action, specifically designed to work with **@wordpress/scripts** tool. Other Github linters don't work very well with WordPress configs, unless you do the trick with importing ESLint/Prettier/StyleLint configs manually. This action runs the command and outputs errors/warnings in a Github-friendly way.
+
+- **Shows WP linting errors** on GitHub commits and PRs
 - Allows **auto-fixing** issues
-- Supports [many linters and formatters](#supported-tools)
+- Currently supports [lint-js, lint-style and lint-md-js](#supported-commands)
 
-_**Note:** The behavior of actions like this one is currently limited in the context of forks. See [Limitations](#limitations)._
+_**Note:** Not all linters are supported at the moment. Some of them don't support JSON output format. See [Limitations](#limitations)._
 
 ## Screenshots
 
@@ -16,22 +18,25 @@ _**Note:** The behavior of actions like this one is currently limited in the con
 
   <img src="./.github/screenshots/check-annotations.png" alt="Screenshot of ESLint annotations" width="90%" />
 
-## Supported tools
+## Supported commands
 
-- **CSS:**
-  - [stylelint](https://stylelint.io)
-- **JavaScript:**
-  - [ESLint](https://eslint.org)
-  - [Prettier](https://prettier.io)
-- **PHP:**
-  - [PHP_CodeSniffer](https://github.com/squizlabs/PHP_CodeSniffer)
+### lint-js
 
+Helps enforce coding style guidelines for your JavaScript and TypeScript files. It uses [eslint](https://eslint.org/) with the set of recommended rules defined in [@wordpress/eslint-plugin](https://www.npmjs.com/package/@wordpress/eslint-plugin) npm package. By default, files located in ```build```, ```node_modules```, and ```vendor``` folders are ignored.
+
+### lint-style
+
+Helps enforce coding style guidelines for your style files. It uses [stylelint](https://github.com/stylelint/stylelint) with the [@wordpress/stylelint-config](https://www.npmjs.com/package/@wordpress/stylelint-config) configuration per the [WordPress CSS Coding Standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/css/). By default lints CSS and SCSS files in the entire project’s directories. Files located in ```build```, ```node_modules```, and ```vendor``` folders are ignored.
+
+### lint-md-js
+
+Uses ESLint to lint the source included in markdown files to enforce standards for JS code. It uses [eslint-plugin-markdown](https://github.com/eslint/eslint-plugin-markdown) with the [.eslintrc-md.js](https://github.com/WordPress/gutenberg/blob/HEAD/packages/scripts/config/.eslintrc-md.js) configuration. This configuration tunes down the linting rules since documentation often includes just snippets of code. It is recommended to use the markdown linting as a check, but not necessarily a blocker since it might report more false errors.
 ## Usage
 
 Create a new GitHub Actions workflow in your project, e.g. at `.github/workflows/lint.yml`. The content of the file should be in the following format:
 
 ```yml
-name: Lint
+name: WPScripts Lint
 
 on:
   # Trigger the workflow on push or pull request,
@@ -53,151 +58,52 @@ jobs:
         uses: actions/checkout@v2
 
       # Install your linters here
-
-      - name: Run linters
-        uses: wearerequired/lint-action@v1
-        with:
-          # Enable your linters here
-```
-
-## Examples
-
-All linters are disabled by default. To enable a linter, simply set the option with its name to `true`, e.g. `eslint: true`.
-
-The action doesn't install the linters for you; you are responsible for installing them in your CI environment.
-
-### JavaScript example (ESLint and Prettier)
-
-```yml
-name: Lint
-
-on:
-  # Trigger the workflow on push or pull request,
-  # but only for the main branch
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  run-linters:
-    name: Run linters
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-
       - name: Set up Node.js
         uses: actions/setup-node@v1
         with:
           node-version: 12
 
-      # ESLint and Prettier must be in `package.json`
+      # @wordpress/scripts must be in `package.json`
       - name: Install Node.js dependencies
         run: npm ci
 
       - name: Run linters
-        uses: wearerequired/lint-action@v1
+        uses: sixach/wpscripts-lint-action@v1
         with:
-          eslint: true
-          prettier: true
+          # Enable your linters here
+          lint_js: true
+          lint_style: true
 ```
 
-**Important:** Make sure to exclude the `.github` directory in your ESLint and Prettier configs as the default `GITHUB_TOKEN` **cannot** be used to update workflow files due to the missing `workflow` permission. See [Limitations](#limitations).
+All linters are disabled by default. To enable a linter, simply set the option with its name to `true`, e.g. `lint_js: true`.
 
-### PHP example (PHP_CodeSniffer)
+The action doesn't install the wp-scripts for you; you are responsible for installing it in your CI environment.
+
+**Important:** Make sure to specify the `src` directory, for example:
 
 ```yml
-name: Lint
-
-on:
-  # Trigger the workflow on push or pull request,
-  # but only for the main branch
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  run-linters:
-    name: Run linters
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "7.4"
-          coverage: none
-          tools: phpcs
-
-      - name: Run linters
-        uses: wearerequired/lint-action@v1
-        with:
-          php_codesniffer: true
-          # Optional: Ignore warnings
-          php_codesniffer_args: "-n"
+- name: Run linters
+  uses: sixach/wpscripts-lint-action@v1
+  with:
+    # Enable your linters here
+    lint_js: true
+    lint_js_args: ./src
+    lint_style: true
+    auto_fix: true
 ```
 
-If you prefer to use [Composer](https://getcomposer.org/) you can also use this:
+As the default `GITHUB_TOKEN` **cannot** be used to update workflow files due to the missing `workflow` permission. See [Limitations](#limitations).
 
-```yml
-name: Lint
-
-on:
-  # Trigger the workflow on push or pull request,
-  # but only for the main branch
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-
-jobs:
-  run-linters:
-    name: Run linters
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v2
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "7.4"
-          coverage: none
-          tools: composer
-
-      - name: Install PHP dependencies
-        run: |
-          composer install --prefer-dist --no-progress --no-ansi --no-interaction
-          echo "${PWD}/vendor/bin" >> $GITHUB_PATH
-
-      - name: Run linters
-        uses: wearerequired/lint-action@v1
-        with:
-          php_codesniffer: true
-```
 ## Configuration
 
 ### Linter-specific options
 
-`[linter]` can be one of `eslint`, `php_codesniffer`, `prettier` and `stylelint`:
+`[linter]` can be one of `lint_js`, `lint_style` and `lint_md_js`:
 
 - **`[linter]`:** Enables the linter in your repository. Default: `false`
-- **`[linter]_args`**: Additional arguments to pass to the linter. Example: `eslint_args: "--max-warnings 0"` if ESLint checks should fail even if there are no errors and only warnings. Default: `""`
-- **`[linter]_dir`**: Directory where the linting command should be run. Example: `eslint_dir: server/` if ESLint is installed in the `server` subdirectory. Default: Repository root
-- **`[linter]_extensions`:** Extensions of files to check with the linter. Example: `eslint_extensions: js,ts` to lint JavaScript and TypeScript files with ESLint. Default: Varies by linter, see [`action.yml`](./action.yml)
+- **`[linter]_args`**: Additional arguments to pass to the linter. Example: `lint_js_args: "--max-warnings 0"` if Lint JS checks should fail even if there are no errors and only warnings. Default: `""`
+- **`[linter]_dir`**: Directory where the linting command should be run. Example: `lint_js_dir: theme/` if Lint JS is installed in the `theme` subdirectory. Default: Repository root
+- **`[linter]_extensions`:** Extensions of files to check with the linter. Example: `lint_js_extensions: js,ts` to lint JavaScript and TypeScript files with WPScripts Lint JS. Default: Varies by linter, see [`action.yml`](./action.yml)
 - **`[linter]_command_prefix`:** Command prefix to be run before the linter command. Default: `""`.
 
 ### General options
@@ -214,7 +120,7 @@ jobs:
 
 - **`git_name`**: Username for auto-fix commits. Default: `"Lint Action"`
 
-- **`git_email`**: Email address for auto-fix commits. Default: `"lint-action@samuelmeuli.com"`
+- **`git_email`**: Email address for auto-fix commits. Default: `"lint-action@sixa.ch"`
 
 - **`git_no_verify`**: Bypass the pre-commit and pre-push git hooks. Default: `false`
 
@@ -230,10 +136,9 @@ Some options are not be available for specific linters:
 
 | Linter                | auto-fixing | extensions |
 | --------------------- | :---------: | :--------: |
-| eslint                |     ✅      |     ✅     |
-| php_codesniffer       |     ❌      |     ✅     |
-| prettier              |     ✅      |     ✅     |
-| stylelint             |     ✅      |     ✅     |
+| lint_js               |     ✅      |     ✅     |
+| lint_style            |     ❌      |     ✅     |
+| lint_md_js            |     ✅      |     ✅     |
 
 ## Limitations
 
@@ -248,10 +153,4 @@ For details and comments, please refer to [#13](https://github.com/wearerequired
 
 ### Auto-fixing workflow files
 
-If `auto_fix` is enabled and the default `GITHUB_TOKEN` is used, none of the linters should be allowed to change files in `.github/workflows` as the token doesn't have the necessary `workflow` permission. This can be achieved by adding the directory to the ignore config of the used linter. [Source](https://github.community/t/github-linting-remote-rejected/121365)
-
-For details and comments, please refer to [#65](https://github.com/wearerequired/lint-action/issues/65) and [#74](https://github.com/wearerequired/lint-action/issues/74).
-
-<br>
-
-[![a required open source product - let's get in touch](https://media.required.com/images/open-source-banner.png)](https://required.com/en/lets-get-in-touch/)
+If `auto_fix` is enabled and the default `GITHUB_TOKEN` is used, none of the linters should be allowed to change files in `.github/workflows` as the token doesn't have the necessary `workflow` permission. This can be achieved by specifying the directory with source files as an argument for the used linter. [Source](https://github.community/t/github-linting-remote-rejected/121365)
