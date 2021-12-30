@@ -47,7 +47,7 @@ class WPScriptsLintMDJS {
 		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args} "."`,
+			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
