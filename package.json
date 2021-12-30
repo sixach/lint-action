@@ -1,10 +1,10 @@
 {
-	"name": "lint-action",
-	"version": "1.10.0",
-	"description": "GitHub Action for detecting and fixing linting errors",
+	"name": "wpscripts-lint-action",
+	"version": "1.0.0",
+	"description": "GitHub Action for detecting and fixing WordPress linting errors",
 	"author": {
-		"name": "Samuel Meuli",
-		"email": "me@samuelmeuli.com",
+		"name": "Sixa",
+		"email": "info@sixa.ch",
 		"url": "https://sixa.ch/"
 	},
 	"repository": "github:sixach/wpscripts-lint-action",
@@ -26,8 +26,6 @@
 	},
 	"peerDependencies": {},
 	"devDependencies": {
-		"@samuelmeuli/eslint-config": "^6.0.0",
-		"@samuelmeuli/prettier-config": "^2.0.1",
 		"@vercel/ncc": "^0.33.0",
 		"eslint": "7.32.0",
 		"eslint-config-airbnb-base": "15.0.0",
@@ -37,51 +35,5 @@
 		"fs-extra": "^10.0.0",
 		"jest": "^27.4.3",
 		"prettier": "^2.5.1"
-	},
-	"eslintConfig": {
-		"root": true,
-		"extends": [
-			"@samuelmeuli/eslint-config",
-			"plugin:jsdoc/recommended"
-		],
-		"env": {
-			"node": true,
-			"jest": true
-		},
-		"settings": {
-			"jsdoc": {
-				"mode": "typescript"
-			}
-		},
-		"rules": {
-			"no-await-in-loop": "off",
-			"no-unused-vars": [
-				"error",
-				{
-					"args": "none",
-					"varsIgnorePattern": "^_"
-				}
-			],
-			"jsdoc/check-indentation": "error",
-			"jsdoc/check-syntax": "error",
-			"jsdoc/newline-after-description": [
-				"error",
-				"never"
-			],
-			"jsdoc/require-description": "error",
-			"jsdoc/require-hyphen-before-param-description": "error",
-			"jsdoc/require-jsdoc": "off"
-		}
-	},
-	"eslintIgnore": [
-		"node_modules/",
-		"test/linters/projects/",
-		"test/tmp/",
-		"dist/"
-	],
-	"jest": {
-		"globalSetup": "./test/setup.js",
-		"globalTeardown": "./test/teardown.js"
-	},
-	"prettier": "@samuelmeuli/prettier-config"
+	}
 }
