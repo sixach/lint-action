@@ -2106,7 +2106,7 @@ class WPScriptsFormat {
 		// Verify that WPScripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-      // Format doesn't have any flags, run lint-js instead
+			// Format doesn't have any flags, run lint-js instead
 			run(`${commandPrefix} wp-scripts lint-js -v`, { dir });
 		} catch (err) {
 			throw new Error(err.message);
@@ -2117,19 +2117,16 @@ class WPScriptsFormat {
 	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
 	 * @param {string} args - Additional arguments to pass to the linter
-   * @param {boolean} fix - Dummy variable for compatibility
+	 * @param {boolean} fix - Dummy variable for compatibility
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
 	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts format ${args}`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
+		return run(`${commandPrefix} wp-scripts format ${args}`, {
+			dir,
+			ignoreErrors: true,
+		});
 	}
 
 	/**
@@ -2143,7 +2140,7 @@ class WPScriptsFormat {
 		const lintResult = initLintResult();
 		lintResult.isSuccess = output.status === 0;
 
-		return false
+		return false;
 	}
 }
 
@@ -2155,7 +2152,7 @@ module.exports = WPScriptsFormat;
 /***/ 565:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const Format = __nccwpck_require__(913)
+const Format = __nccwpck_require__(913);
 const LintJs = __nccwpck_require__(638);
 const LintMdJs = __nccwpck_require__(11);
 const LintStyle = __nccwpck_require__(430);
@@ -2223,13 +2220,10 @@ class WPScriptsLintJS {
 	 */
 	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts lint-js --format json --no-color ${args}`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
+		return run(`${commandPrefix} wp-scripts lint-js --format json --no-color ${args}`, {
+			dir,
+			ignoreErrors: true,
+		});
 	}
 
 	/**
@@ -2336,13 +2330,10 @@ class WPScriptsLintMDJS {
 	 */
 	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts lint-md-js --no-color --format json ${args}`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
+		return run(`${commandPrefix} wp-scripts lint-md-js --no-color --format json ${args}`, {
+			dir,
+			ignoreErrors: true,
+		});
 	}
 
 	/**
@@ -3010,14 +3001,14 @@ async function runAction() {
 			const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
 
 			// Skip annotations for WP-Scripts Format
-			if (!(linter.name === 'WP-Scripts Format')) {
+			if (!(linter.name === "WP-Scripts Format")) {
 				// Parse output of linting command
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);
 				const summary = getSummary(lintResult);
 				core.info(
 					`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
 				);
-	
+
 				if (!lintResult.isSuccess) {
 					hasFailures = true;
 				}
@@ -3056,7 +3047,7 @@ async function runAction() {
 		),
 	);
 	core.endGroup();
-		
+
 	if (hasFailures && !continueOnError) {
 		core.setFailed("Linting failures detected. See check runs with annotations for details.");
 	}
