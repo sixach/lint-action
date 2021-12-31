@@ -44,13 +44,10 @@ class WPScriptsLintJS {
 	 */
 	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} wp-scripts lint-js --format json --no-color ${args}`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
+		return run(`${commandPrefix} wp-scripts lint-js --format json --no-color ${args}`, {
+			dir,
+			ignoreErrors: true,
+		});
 	}
 
 	/**

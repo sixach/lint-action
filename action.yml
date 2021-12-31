@@ -94,7 +94,7 @@ inputs:
     required: false
     default: ""
 
-# JavaScript in Markdown
+  # JavaScript in Markdown
 
   lint_md_js:
     description: Enable or disable WPScripts Lint Markdown JS check

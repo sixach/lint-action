@@ -29,7 +29,7 @@ function getLintParams(dir) {
 				{
 					firstLine: 2,
 					lastLine: 2,
-					message: "Unexpected named color \"red\" (color-named)",
+					message: 'Unexpected named color "red" (color-named)',
 					path: "file1.css",
 				},
 				{
@@ -77,7 +77,7 @@ function getFixParams(dir) {
 					path: "file1.css",
 					firstLine: 2,
 					lastLine: 2,
-					message: "Unexpected named color \"red\" (color-named)",
+					message: 'Unexpected named color "red" (color-named)',
 				},
 				{
 					path: "file2.scss",

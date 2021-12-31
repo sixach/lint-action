@@ -1,4 +1,4 @@
-const Format = require("./format")
+const Format = require("./format");
 const LintJs = require("./lint-js");
 const LintMdJs = require("./lint-md-js");
 const LintStyle = require("./lint-style");

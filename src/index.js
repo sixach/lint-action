@@ -83,14 +83,14 @@ async function runAction() {
 			const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
 
 			// Skip annotations for WP-Scripts Format
-			if (!(linter.name === 'WP-Scripts Format')) {
+			if (!(linter.name === "WP-Scripts Format")) {
 				// Parse output of linting command
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);
 				const summary = getSummary(lintResult);
 				core.info(
 					`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
 				);
-	
+
 				if (!lintResult.isSuccess) {
 					hasFailures = true;
 				}
@@ -129,7 +129,7 @@ async function runAction() {
 		),
 	);
 	core.endGroup();
-		
+
 	if (hasFailures && !continueOnError) {
 		core.setFailed("Linting failures detected. See check runs with annotations for details.");
 	}

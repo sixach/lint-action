@@ -7,11 +7,7 @@ const eslintParams = require("./params/eslint");
 const eslintTypescriptParams = require("./params/eslint-typescript");
 const stylelintParams = require("./params/stylelint");
 
-const linterParams = [
-	eslintParams,
-	eslintTypescriptParams,
-	stylelintParams,
-];
+const linterParams = [eslintParams, eslintTypescriptParams, stylelintParams];
 
 const tmpDir = createTmpDir();
 jest.setTimeout(300000);
@@ -49,7 +45,7 @@ describe.each(linterParams)(
 				expect(cmdOutput.status).toEqual(expected.cmdOutput.status);
 
 				// Skip test for `wp-scripts format`
-				if (!(autoFix && linter.name === 'WP-Scripts Lint JS')) {
+				if (!(autoFix && linter.name === "WP-Scripts Lint JS")) {
 					// stdout
 					let stdout = normalizeDates(cmdOutput.stdout);
 					stdout = normalizePaths(stdout, tmpDir);
@@ -75,7 +71,7 @@ describe.each(linterParams)(
 			});
 
 			// Skip test for `wp-scripts format`
-			if (!(autoFix && linter.name === 'WP-Scripts Lint JS')) {
+			if (!(autoFix && linter.name === "WP-Scripts Lint JS")) {
 				// Test `parseOutput` function
 				test(`${linter.name} parses ${lintMode} output correctly`, () => {
 					const lintResult = linter.parseOutput(projectTmpDir, expected.cmdOutput);
