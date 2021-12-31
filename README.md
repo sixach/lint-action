@@ -4,7 +4,7 @@ This is a WordPress linter action, specifically designed to work with **@wordpre
 
 - **Shows WP linting errors** on GitHub commits and PRs
 - Allows **auto-fixing** issues
-- Currently supports [lint-js, lint-style and lint-md-js](#supported-commands)
+- Currently supports [lint-js, lint-style, lint-md-js and format](#supported-commands)
 
 _**Note:** Not all linters are supported at the moment. Some of them don't support JSON output format. See [Limitations](#limitations)._
 
@@ -22,15 +22,20 @@ _**Note:** Not all linters are supported at the moment. Some of them don't suppo
 
 ### lint-js
 
-Helps enforce coding style guidelines for your JavaScript and TypeScript files. It uses [eslint](https://eslint.org/) with the set of recommended rules defined in [@wordpress/eslint-plugin](https://www.npmjs.com/package/@wordpress/eslint-plugin) npm package. By default, files located in ```build```, ```node_modules```, and ```vendor``` folders are ignored.
+Helps enforce coding style guidelines for your JavaScript and TypeScript files. It uses [eslint](https://eslint.org/) with the set of recommended rules defined in [@wordpress/eslint-plugin](https://www.npmjs.com/package/@wordpress/eslint-plugin) npm package. By default, files located in `build`, `node_modules`, and `vendor` folders are ignored.
 
 ### lint-style
 
-Helps enforce coding style guidelines for your style files. It uses [stylelint](https://github.com/stylelint/stylelint) with the [@wordpress/stylelint-config](https://www.npmjs.com/package/@wordpress/stylelint-config) configuration per the [WordPress CSS Coding Standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/css/). By default lints CSS and SCSS files in the entire project’s directories. Files located in ```build```, ```node_modules```, and ```vendor``` folders are ignored.
+Helps enforce coding style guidelines for your style files. It uses [stylelint](https://github.com/stylelint/stylelint) with the [@wordpress/stylelint-config](https://www.npmjs.com/package/@wordpress/stylelint-config) configuration per the [WordPress CSS Coding Standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/css/). By default lints CSS and SCSS files in the entire project’s directories. Files located in `build`, `node_modules`, and `vendor` folders are ignored.
 
 ### lint-md-js
 
 Uses ESLint to lint the source included in markdown files to enforce standards for JS code. It uses [eslint-plugin-markdown](https://github.com/eslint/eslint-plugin-markdown) with the [.eslintrc-md.js](https://github.com/WordPress/gutenberg/blob/HEAD/packages/scripts/config/.eslintrc-md.js) configuration. This configuration tunes down the linting rules since documentation often includes just snippets of code. It is recommended to use the markdown linting as a check, but not necessarily a blocker since it might report more false errors.
+
+### format
+
+It helps to enforce coding style guidelines for your files (JavaScript, YAML) by formatting source code in a consistent way. By default, files located in `build`, `node_modules`, and `vendor` folders are ignored. You can customize the list of ignored files and directories by adding them to a ```.prettierignore``` file in your project.
+
 ## Usage
 
 Create a new GitHub Actions workflow in your project, e.g. at `.github/workflows/lint.yml`. The content of the file should be in the following format:
@@ -71,8 +76,11 @@ jobs:
         uses: sixach/wpscripts-lint-action@v1
         with:
           # Enable your linters here
+          format: true
           lint_js: true
+          lint_js_args: ./src
           lint_style: true
+          fix_mode: true
 ```
 
 All linters are disabled by default. To enable a linter, simply set the option with its name to `true`, e.g. `lint_js: true`.
@@ -89,22 +97,21 @@ The action doesn't install the wp-scripts for you; you are responsible for insta
     lint_js: true
     lint_js_args: ./src
     lint_style: true
-    auto_fix: true
+    fix_mode: true
 ```
 
 As the default `GITHUB_TOKEN` **cannot** be used to update workflow files due to the missing `workflow` permission. See [Limitations](#limitations).
 
 ## Configuration
 
-### Linter-specific options
+### Command-specific options
 
-`[linter]` can be one of `lint_js`, `lint_style` and `lint_md_js`:
+`[command]` can be one of `lint_js`, `lint_style`, `lint_md_js` and `format`:
 
-- **`[linter]`:** Enables the linter in your repository. Default: `false`
-- **`[linter]_args`**: Additional arguments to pass to the linter. Example: `lint_js_args: "--max-warnings 0"` if Lint JS checks should fail even if there are no errors and only warnings. Default: `""`
-- **`[linter]_dir`**: Directory where the linting command should be run. Example: `lint_js_dir: theme/` if Lint JS is installed in the `theme` subdirectory. Default: Repository root
-- **`[linter]_extensions`:** Extensions of files to check with the linter. Example: `lint_js_extensions: js,ts` to lint JavaScript and TypeScript files with WPScripts Lint JS. Default: Varies by linter, see [`action.yml`](./action.yml)
-- **`[linter]_command_prefix`:** Command prefix to be run before the linter command. Default: `""`.
+- **`[command]`:** Enables the linter in your repository. Default: `false`
+- **`[command]_args`**: Additional arguments to pass to the linter. Example: `lint_js_args: "--max-warnings 0"` if Lint JS checks should fail even if there are no errors and only warnings. Default: `""`
+- **`[command]_dir`**: Directory where the linting command should be run. Example: `lint_js_dir: theme/` if Lint JS is installed in the `theme` subdirectory. Default: Repository root
+- **`[command]_prefix`:** Command prefix to be run before the linter command. Default: `""`.
 
 ### General options
 
@@ -112,7 +119,7 @@ As the default `GITHUB_TOKEN` **cannot** be used to update workflow files due to
 
 - **`continue_on_error`:** Whether the workflow run should also fail when linter failures are detected. Default: `true`
 
-- **`auto_fix`:** Whether linters should try to fix code style issues automatically. If some issues can be fixed, the action will commit and push the changes to the corresponding branch. Default: `false`
+- **`fix_mode`:** Whether linters should try to fix code style issues automatically. If some issues can be fixed, the action will commit and push the changes to the corresponding branch. Default: `false`
 
   <p align="center">
     <img src="./.github/screenshots/auto-fix.png" alt="Screenshot of auto-fix commit" width="80%" />
@@ -134,11 +141,11 @@ As the default `GITHUB_TOKEN` **cannot** be used to update workflow files due to
 
 Some options are not be available for specific linters:
 
-| Linter                | auto-fixing | extensions |
-| --------------------- | :---------: | :--------: |
-| lint_js               |     ✅      |     ✅     |
-| lint_style            |     ❌      |     ✅     |
-| lint_md_js            |     ✅      |     ✅     |
+| Linter                | auto-fixing |
+| --------------------- | :---------: |
+| lint_js               |     ❌      |
+| lint_style            |     ✅      |
+| lint_md_js            |     ❌      |
 
 ## Limitations
 
@@ -148,8 +155,6 @@ There are currently some limitations as to how this action (or any other action)
 
 - The action doesn't have permission to push auto-fix changes to the fork. This is because the `pull_request` event runs on the upstream repo, where the `github_token` is lacking permissions for the fork. [Source](https://github.community/t5/GitHub-Actions/Can-t-push-to-forked-repository-on-the-original-repository-s/m-p/35916/highlight/true#M2372)
 - The action doesn't have permission to create annotations for commits on forks and can therefore not display linting errors. [Source 1](https://github.community/t5/GitHub-Actions/Token-permissions-for-forks-once-again/m-p/33839), [source 2](https://github.com/actions/labeler/issues/12)
-
-For details and comments, please refer to [#13](https://github.com/wearerequired/lint-action/issues/13).
 
 ### Auto-fixing workflow files
 
