@@ -71,13 +71,13 @@ async function runAction() {
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
-			core.info(`1️⃣ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
+			core.info(`☞ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
 			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`2️⃣ Verified ${chalk.blue.bold(linter.name)} setup`);
+			core.info(`☞ Verified ${chalk.blue.bold(linter.name)} setup`);
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`${fixMode ? "3️⃣ Fixing and linting" : "3️⃣ Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
+				`☞ ${fixMode ? "Fixing and linting" : "Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
 			);
 
 			// Run linter command
@@ -89,7 +89,7 @@ async function runAction() {
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);
 				const summary = getSummary(lintResult);
 				core.info(
-					`ℹ️ ${linter.name} found: ${summary}\n Result: ${lintResult.isSuccess ? "Success" : "Failure"}`,
+					`⚠️ ${linter.name} found: ${summary}\n Result: ${lintResult.isSuccess ? "Success" : "Failure"}`,
 				);
 
 				if (!lintResult.isSuccess) {
