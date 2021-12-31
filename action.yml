@@ -53,7 +53,7 @@ inputs:
   format_dir:
     description: Directory where the WPScripts Format command should be run
     required: false
-  format_command_prefix:
+  format_prefix:
     description: Shell command to prepend to the format command
     required: false
     default: ""
@@ -71,7 +71,7 @@ inputs:
   lint_style_dir:
     description: Directory where the WPScripts Lint Style command should be run
     required: false
-  lint_style_command_prefix:
+  lint_style_prefix:
     description: Shell command to prepend to the linter command
     required: false
     default: ""
@@ -89,7 +89,7 @@ inputs:
   lint_js_dir:
     description: Directory where the WPScripts Lint JS command should be run
     required: false
-  lint_js_command_prefix:
+  lint_js_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
     required: false
     default: ""
@@ -107,7 +107,7 @@ inputs:
   lint_md_js_dir:
     description: Directory where the WPScripts Lint Markdown JS command should be run
     required: false
-  lint_md_js_command_prefix:
+  lint_md_js_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
     required: false
     default: ""
