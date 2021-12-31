@@ -117,7 +117,7 @@ As the default `GITHUB_TOKEN` **cannot** be used to update workflow files due to
 
 - **`github_token`:** The `GITHUB_TOKEN` to [authenticate on behalf of GitHub Actions](https://docs.github.com/en/free-pro-team@latest/actions/reference/authentication-in-a-workflow#using-the-github_token-in-a-workflow). Defaults to the GitHub token.
 
-- **`continue_on_error`:** Whether the workflow run should also fail when linter failures are detected. Default: `true`
+- **`continue_on_error`:** Whether the workflow run should also fail when linter failures are detected. Default: `false`
 
 - **`fix_mode`:** Whether linters should try to fix code style issues automatically. If some issues can be fixed, the action will commit and push the changes to the corresponding branch. Default: `false`
 
@@ -158,4 +158,4 @@ There are currently some limitations as to how this action (or any other action)
 
 ### Auto-fixing workflow files
 
-If `auto_fix` is enabled and the default `GITHUB_TOKEN` is used, none of the linters should be allowed to change files in `.github/workflows` as the token doesn't have the necessary `workflow` permission. This can be achieved by specifying the directory with source files as an argument for the used linter. [Source](https://github.community/t/github-linting-remote-rejected/121365)
+If `fix_mode` is enabled and the default `GITHUB_TOKEN` is used, none of the linters should be allowed to change files in `.github/workflows` as the token doesn't have the necessary `workflow` permission. This can be achieved by specifying the directory with source files as an argument for the used linter. [Source](https://github.community/t/github-linting-remote-rejected/121365)
