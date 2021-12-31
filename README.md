@@ -77,6 +77,7 @@ jobs:
         with:
           # Enable your linters here
           format: true
+          format_args: ./src
           lint_js: true
           lint_js_args: ./src
           lint_style: true
