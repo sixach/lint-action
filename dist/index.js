@@ -2993,7 +2993,7 @@ async function runAction() {
 
 			const args = core.getInput(`${linterId}_args`);
 			const lintDirRel = core.getInput(`${linterId}_dir`) || ".";
-			const prefix = core.getInput(`${linterId}_command_prefix`);
+			const prefix = core.getInput(`${linterId}_prefix`);
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
@@ -3003,12 +3003,14 @@ async function runAction() {
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`${fixMode ? "Fixing" : "Linting"} files in ${lintDirAbs} with ${linter.name}…`,
+				`${fixMode ? "Fixing and linting" : "Linting"} files in ${lintDirAbs} with ${linter.name}…`,
 			);
 
-			if (!fixMode) {
-				const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
+			// Run linter command
+			const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
 
+			// Skip annotations for WP-Scripts Format
+			if (!(linter.name === 'WP-Scripts Format')) {
 				// Parse output of linting command
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);
 				const summary = getSummary(lintResult);
@@ -3047,18 +3049,16 @@ async function runAction() {
 		headSha = git.getHeadSha();
 	}
 
-	if (!fixMode) {
-		core.startGroup("Create check runs with commit annotations");
-		await Promise.all(
-			checks.map(({ lintCheckName, lintResult, summary }) =>
-				createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
-			),
-		);
-		core.endGroup();
+	core.startGroup("Create check runs with commit annotations");
+	await Promise.all(
+		checks.map(({ lintCheckName, lintResult, summary }) =>
+			createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
+		),
+	);
+	core.endGroup();
 		
-		if (hasFailures && !continueOnError) {
-			core.setFailed("Linting failures detected. See check runs with annotations for details.");
-		}
+	if (hasFailures && !continueOnError) {
+		core.setFailed("Linting failures detected. See check runs with annotations for details.");
 	}
 }
 
