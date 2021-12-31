@@ -2116,13 +2116,12 @@ class WPScriptsFormat {
 	/**
 	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - Dummy variable for compatibility
 	 * @param {string} args - Additional arguments to pass to the linter
    * @param {boolean} fix - Dummy variable for compatibility
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
 			`${commandPrefix} wp-scripts format ${args}`,
@@ -2217,17 +2216,15 @@ class WPScriptsLintJS {
 	/**
 	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-js --format json --ext ${extensionsArg} --no-color ${args}`,
+			`${commandPrefix} wp-scripts lint-js --format json --no-color ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -2332,17 +2329,15 @@ class WPScriptsLintMDJS {
 	/**
 	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args}`,
+			`${commandPrefix} wp-scripts lint-md-js --no-color --format json ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -2446,19 +2441,16 @@ class WPScriptsLintStyle {
 	/**
 	 * Runs the lint-style command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const fixArg = fix ? "--fix" : "";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`,
+			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -2999,7 +2991,6 @@ async function runAction() {
 		if (core.getInput(linterId) === "true") {
 			core.startGroup(`Run ${linter.name}`);
 
-			const fileExtensions = core.getInput(`${linterId}_extensions`, { required: true });
 			const args = core.getInput(`${linterId}_args`);
 			const lintDirRel = core.getInput(`${linterId}_dir`) || ".";
 			const prefix = core.getInput(`${linterId}_command_prefix`);
@@ -3010,17 +3001,13 @@ async function runAction() {
 			await linter.verifySetup(lintDirAbs, prefix);
 			core.info(`Verified ${linter.name} setup`);
 
-			// Determine which files should be linted
-			const fileExtList = fileExtensions.split(",");
-			core.info(`Will use ${linter.name} to check the files with extensions ${fileExtList}`);
-
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
 				`${fixMode ? "Fixing" : "Linting"} files in ${lintDirAbs} with ${linter.name}…`,
 			);
 
 			if (!fixMode) {
-				const lintOutput = linter.lint(lintDirAbs, fileExtList, args, fixMode, prefix);
+				const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
 
 				// Parse output of linting command
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);

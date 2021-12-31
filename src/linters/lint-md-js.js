@@ -37,17 +37,15 @@ class WPScriptsLintMDJS {
 	/**
 	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-md-js --ext ${extensionsArg} --no-color --format json ${args}`,
+			`${commandPrefix} wp-scripts lint-md-js --no-color --format json ${args}`,
 			{
 				dir,
 				ignoreErrors: true,

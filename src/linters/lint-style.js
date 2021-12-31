@@ -36,19 +36,16 @@ class WPScriptsLintStyle {
 	/**
 	 * Runs the lint-style command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const fixArg = fix ? "--fix" : "";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args} "${files}"`,
+			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args}`,
 			{
 				dir,
 				ignoreErrors: true,

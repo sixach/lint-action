@@ -38,13 +38,12 @@ class WPScriptsFormat {
 	/**
 	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - Dummy variable for compatibility
 	 * @param {string} args - Additional arguments to pass to the linter
    * @param {boolean} fix - Dummy variable for compatibility
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
 			`${commandPrefix} wp-scripts format ${args}`,
