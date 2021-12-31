@@ -29,15 +29,15 @@ function getSummary(lintResult) {
 	const nrWarnings = lintResult.warning.length;
 	// Build and log a summary of linting errors/warnings
 	if (nrWarnings > 0 && nrErrors > 0) {
-		return `\n\t• ${nrErrors} error${nrErrors > 1 ? "s" : ""}\n\t• ${nrWarnings} warning${
+		return `\n • ${nrErrors} error${nrErrors > 1 ? "s" : ""}\n • ${nrWarnings} warning${
 			nrWarnings > 1 ? "s" : ""
 		}`;
 	}
 	if (nrErrors > 0) {
-		return `\n\t• ${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
+		return `\n • ${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
 	}
 	if (nrWarnings > 0) {
-		return `\n\t• ${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
+		return `\n • ${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
 	}
 	return `no issues`;
 }

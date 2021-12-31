@@ -4594,15 +4594,15 @@ function getSummary(lintResult) {
 	const nrWarnings = lintResult.warning.length;
 	// Build and log a summary of linting errors/warnings
 	if (nrWarnings > 0 && nrErrors > 0) {
-		return `\n\t• ${nrErrors} error${nrErrors > 1 ? "s" : ""}\n\t• ${nrWarnings} warning${
+		return `\n • ${nrErrors} error${nrErrors > 1 ? "s" : ""}\n • ${nrWarnings} warning${
 			nrWarnings > 1 ? "s" : ""
 		}`;
 	}
 	if (nrErrors > 0) {
-		return `\n\t• ${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
+		return `\n • ${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
 	}
 	if (nrWarnings > 0) {
-		return `\n\t• ${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
+		return `\n • ${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
 	}
 	return `no issues`;
 }
@@ -4964,9 +4964,9 @@ async function runAction() {
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
-			core.info(`❔ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
+			core.info(`➡️ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
 			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`✔️ Verified ${chalk.blue.bold(linter.name)} setup`);
+			core.info(`➡️ Verified ${chalk.blue.bold(linter.name)} setup`);
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
@@ -4982,7 +4982,7 @@ async function runAction() {
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);
 				const summary = getSummary(lintResult);
 				core.info(
-					`ℹ️ ${linter.name} found: ${summary}\n\tResult: ${lintResult.isSuccess ? "Success" : "Failure"})`,
+					`ℹ️ ${linter.name} found: ${summary}\n Result: ${lintResult.isSuccess ? "Success" : "Failure"}`,
 				);
 
 				if (!lintResult.isSuccess) {
