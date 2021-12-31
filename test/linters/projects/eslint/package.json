@@ -1,8 +1,0 @@
-{
-	"name": "test-eslint",
-	"main": "index.js",
-	"private": true,
-	"devDependencies": {
-		"eslint": "^7.21.0"
-	}
-}

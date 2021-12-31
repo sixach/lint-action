@@ -2,7 +2,7 @@
 
 ## Source Code
 
-Parts of this action's code are inspired by the [ESLint Action](https://github.com/gimenete/eslint-action) by Alberto Gimeno.
+Parts of this action's code are inspired by the [Lint Action](wearerequired/lint-action) by We Are Required.
 
 > MIT License
 >

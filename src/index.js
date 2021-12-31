@@ -1,6 +1,7 @@
 const { join } = require("path");
 
 const core = require("@actions/core");
+const chalk = require("chalk");
 
 const git = require("./git");
 const { createCheck } = require("./github/api");
@@ -13,7 +14,7 @@ const { getSummary } = require("./utils/lint-result");
  */
 async function runAction() {
 	const context = getContext();
-	const autoFix = core.getInput("auto_fix") === "true";
+	const fixMode = core.getInput("fix_mode") === "true";
 	const skipVerification = core.getInput("git_no_verify") === "true";
 	const continueOnError = core.getInput("continue_on_error") === "true";
 	const gitName = core.getInput("git_name", { required: true });
@@ -27,16 +28,16 @@ async function runAction() {
 	// If on a PR from fork: Display messages regarding action limitations
 	if (isPullRequest && context.repository.hasFork) {
 		core.error(
-			"This action does not have permission to create annotations on forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
+			"❌ This action does not have permission to create annotations on forks. You may want to run it only on `push` events.",
 		);
-		if (autoFix) {
+		if (fixMode) {
 			core.error(
-				"This action does not have permission to push to forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
+				"❌ This action does not have permission to push to forks. You may want to run it only on `push` events.",
 			);
 		}
 	}
 
-	if (autoFix) {
+	if (fixMode) {
 		// Set Git committer username and password
 		git.setUserInfo(gitName, gitEmail);
 	}
@@ -62,54 +63,54 @@ async function runAction() {
 	for (const [linterId, linter] of Object.entries(linters)) {
 		// Determine whether the linter should be executed on the commit
 		if (core.getInput(linterId) === "true") {
-			core.startGroup(`Run ${linter.name}`);
+			core.startGroup(`🚀 Run ${linter.name}`);
 
-			const fileExtensions = core.getInput(`${linterId}_extensions`, { required: true });
 			const args = core.getInput(`${linterId}_args`);
 			const lintDirRel = core.getInput(`${linterId}_dir`) || ".";
-			const prefix = core.getInput(`${linterId}_command_prefix`);
+			const prefix = core.getInput(`${linterId}_prefix`);
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
-			core.info(`Verifying setup for ${linter.name}…`);
+			core.info(`☞ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
 			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`Verified ${linter.name} setup`);
-
-			// Determine which files should be linted
-			const fileExtList = fileExtensions.split(",");
-			core.info(`Will use ${linter.name} to check the files with extensions ${fileExtList}`);
+			core.info(`☞ Verified ${chalk.blue.bold(linter.name)} setup`);
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`Linting ${autoFix ? "and auto-fixing " : ""}files in ${lintDirAbs} with ${linter.name}…`,
-			);
-			const lintOutput = linter.lint(lintDirAbs, fileExtList, args, autoFix, prefix);
-
-			// Parse output of linting command
-			const lintResult = linter.parseOutput(context.workspace, lintOutput);
-			const summary = getSummary(lintResult);
-			core.info(
-				`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
+				`☞ ${fixMode ? "Fixing and linting" : "Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
 			);
 
-			if (!lintResult.isSuccess) {
-				hasFailures = true;
+			// Run linter command
+			const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
+
+			// Skip annotations for WP-Scripts Format
+			if (!(linter.name === "WP-Scripts Format")) {
+				// Parse output of linting command
+				const lintResult = linter.parseOutput(context.workspace, lintOutput);
+				const summary = getSummary(lintResult);
+				core.info(
+					`⚠️ ${linter.name} found: ${summary}\n Result: ${lintResult.isSuccess ? "Success" : "Failure"}`,
+				);
+
+				if (!lintResult.isSuccess) {
+					hasFailures = true;
+				}
+
+				const lintCheckName = checkName
+					.replace(/\${linter}/g, linter.name)
+					.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
+					.trim();
+
+				checks.push({ lintCheckName, lintResult, summary });
 			}
 
-			if (autoFix) {
+			if (fixMode) {
 				// Commit and push auto-fix changes
 				if (git.hasChanges()) {
 					git.commitChanges(commitMessage.replace(/\${linter}/g, linter.name), skipVerification);
 					git.pushChanges(skipVerification);
 				}
 			}
-
-			const lintCheckName = checkName
-				.replace(/\${linter}/g, linter.name)
-				.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
-				.trim();
-
-			checks.push({ lintCheckName, lintResult, summary });
 
 			core.endGroup();
 		}
@@ -118,11 +119,11 @@ async function runAction() {
 	// Add commit annotations after running all linters. To be displayed on pull requests, the
 	// annotations must be added to the last commit on the branch. This can either be a user commit or
 	// one of the auto-fix commits
-	if (isPullRequest && autoFix) {
+	if (isPullRequest && fixMode) {
 		headSha = git.getHeadSha();
 	}
 
-	core.startGroup("Create check runs with commit annotations");
+	core.startGroup("📝 Create check runs with commit annotations");
 	await Promise.all(
 		checks.map(({ lintCheckName, lintResult, summary }) =>
 			createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
@@ -131,7 +132,7 @@ async function runAction() {
 	core.endGroup();
 
 	if (hasFailures && !continueOnError) {
-		core.setFailed("Linting failures detected. See check runs with annotations for details.");
+		core.setFailed("❌ Linting failures detected. See check runs with annotations for details.");
 	}
 }
 

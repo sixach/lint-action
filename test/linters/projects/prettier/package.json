@@ -1,8 +1,0 @@
-{
-	"name": "test-prettier",
-	"main": "index.js",
-	"private": true,
-	"devDependencies": {
-		"prettier": "^2.2.1"
-	}
-}

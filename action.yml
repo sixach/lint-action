@@ -1,6 +1,6 @@
-name: Lint Action
-author: Samuel Meuli
-description: GitHub Action for detecting and fixing linting errors
+name: WPScripts Lint Action
+author: Sixa
+description: GitHub Action for detecting and fixing WP theme/plugin linting errors
 
 inputs:
   github_token:
@@ -10,8 +10,8 @@ inputs:
   continue_on_error:
     description: Whether the workflow run should also fail when linter failures are detected
     required: false
-    default: "true"
-  auto_fix:
+    default: "false"
+  fix_mode:
     description: Whether linters should try to fix code style issues automatically
     required: false
     default: "false"
@@ -26,7 +26,7 @@ inputs:
   git_email:
     description: Email address for auto-fix commits
     required: false
-    default: "lint-action@samuelmeuli.com"
+    default: "info@sixa.ch"
   commit_message:
     description: 'Template for auto-fix commit messages. The "${linter}" variable can be used to insert the name of the linter which has created the auto-fix'
     required: false
@@ -40,339 +40,75 @@ inputs:
     required: false
     default: "false"
 
+  # Format
+
+  format:
+    description: Run WPScripts Format command to fix prettier styling
+    required: false
+    default: "false"
+  format_args:
+    description: Additional arguments to pass to the format
+    required: false
+    default: ""
+  format_dir:
+    description: Directory where the WPScripts Format command should be run
+    required: false
+  format_prefix:
+    description: Shell command to prepend to the format command
+    required: false
+    default: ""
+
   # CSS
 
-  stylelint:
-    description: Enable or disable stylelint checks
+  lint_style:
+    description: Enable or disable WPScripts Lint Style checks
     required: false
     default: "false"
-  stylelint_args:
+  lint_style_args:
     description: Additional arguments to pass to the linter
     required: false
     default: ""
-  stylelint_dir:
-    description: Directory where the stylelint command should be run
+  lint_style_dir:
+    description: Directory where the WPScripts Lint Style command should be run
     required: false
-  stylelint_extensions:
-    description: Extensions of files to check with stylelint
-    required: false
-    default: "css,sass,scss"
-  stylelint_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  # Go
-
-  gofmt:
-    description: Enable or disable gofmt checks
-    required: false
-    default: "false"
-  gofmt_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  gofmt_dir:
-    description: Directory where the gofmt command should be run
-    required: false
-  gofmt_extensions:
-    description: Extensions of files to check with gofmt
-    required: false
-    default: "go"
-  gofmt_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  golint:
-    description: Enable or disable golint checks
-    required: false
-    default: "false"
-  golint_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  golint_dir:
-    description: Directory where the golint command should be run
-    required: false
-  golint_extensions:
-    description: Extensions of files to check with golint
-    required: false
-    default: "go"
-  golint_command_prefix:
+  lint_style_prefix:
     description: Shell command to prepend to the linter command
     required: false
     default: ""
 
   # JavaScript
 
-  eslint:
-    description: Enable or disable ESLint checks
+  lint_js:
+    description: Enable or disable WPScripts Lint JS check
     required: false
     default: "false"
-  eslint_args:
+  lint_js_args:
     description: Additional arguments to pass to the linter
     required: false
     default: ""
-  eslint_dir:
-    description: Directory where the ESLint command should be run
+  lint_js_dir:
+    description: Directory where the WPScripts Lint JS command should be run
     required: false
-  eslint_extensions:
-    description: Extensions of files to check with ESLint
-    required: false
-    default: "js"
-  eslint_command_prefix:
+  lint_js_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
     required: false
     default: ""
 
-  prettier:
-    description: Enable or disable Prettier checks
+  # JavaScript in Markdown
+
+  lint_md_js:
+    description: Enable or disable WPScripts Lint Markdown JS check
     required: false
     default: "false"
-  prettier_args:
+  lint_md_js_args:
     description: Additional arguments to pass to the linter
     required: false
     default: ""
-  prettier_dir:
-    description: Directory where the Prettier command should be run
+  lint_md_js_dir:
+    description: Directory where the WPScripts Lint Markdown JS command should be run
     required: false
-  prettier_extensions:
-    description: Extensions of files to check with Prettier
-    required: false
-    default: "css,html,js,json,jsx,md,sass,scss,ts,tsx,vue,yaml,yml"
-  prettier_command_prefix:
+  lint_md_js_prefix:
     description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
-    required: false
-    default: ""
-
-  xo:
-    description: Enable or disable XO checks
-    required: false
-    default: "false"
-  xo_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  xo_dir:
-    description: Directory where the XO command should be run
-    required: false
-  xo_extensions:
-    description: Extensions of files to check with XO
-    required: false
-    default: "js"
-  xo_command_prefix:
-    description: Shell command to prepend to the linter command. Will default to `npx --no-install` for NPM and `yarn run --silent` for Yarn.
-    required: false
-    default: ""
-
-  # PHP
-
-  php_codesniffer:
-    description: Enable or disable PHP_CodeSniffer checks
-    required: false
-    default: "false"
-  php_codesniffer_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  php_codesniffer_dir:
-    description: Directory where the PHP_CodeSniffer command should be run
-    required: false
-  php_codesniffer_extensions:
-    description: Extensions of files to check with PHP_CodeSniffer
-    required: false
-    default: "php"
-  php_codesniffer_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  # Python
-
-  black:
-    description: Enable or disable Black checks
-    required: false
-    default: "false"
-  black_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  black_dir:
-    description: Directory where the Black command should be run
-    required: false
-  black_extensions:
-    description: Extensions of files to check with Black
-    required: false
-    default: "py"
-  black_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  flake8:
-    description: Enable or disable Flake8 checks
-    required: false
-    default: "false"
-  flake8_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  flake8_dir:
-    description: Directory where the Flake8 command should be run
-    required: false
-  flake8_extensions:
-    description: Extensions of files to check with Flake8
-    required: false
-    default: "py"
-  flake8_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  mypy:
-    description: Enable or disable Mypy checks
-    required: false
-    default: "false"
-  mypy_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  mypy_dir:
-    description: Directory where the Mypy command should be run
-    required: false
-  mypy_extensions:
-    description: Extensions of files to check with Mypy
-    required: false
-    default: "py"
-  mypy_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  oitnb:
-    description: Enable or disable oitnb checks
-    required: false
-    default: "false"
-  oitnb_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  oitnb_dir:
-    description: Directory where the oitnb command should be run
-    required: false
-  oitnb_extensions:
-    description: Extensions of files to check with oitnb
-    required: false
-    default: "py"
-  oitnb_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  # Ruby
-
-  rubocop:
-    description: Enable or disable RuboCop checks
-    required: false
-    default: "false"
-  rubocop_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  rubocop_dir:
-    description: Directory where the RuboCop command should be run
-    required: false
-  rubocop_extensions:
-    description: Extensions of files to check with RuboCop
-    required: false
-    default: "rb"
-  rubocop_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  # Swift
-
-  # Alias of `swift_format_lockwood` (for backward compatibility)
-  # TODO: Remove alias in v2
-  swiftformat:
-    description: Enable or disable SwiftFormat checks
-    required: false
-    default: "false"
-  swiftformat_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  swiftformat_dir:
-    description: Directory where the SwiftFormat command should be run
-    required: false
-  swiftformat_extensions:
-    description: Extensions of files to check with SwiftFormat
-    required: false
-    default: "swift"
-  swiftformat_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  swift_format_lockwood:
-    description: Enable or disable SwiftFormat checks
-    required: false
-    default: "false"
-  swift_format_lockwood_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  swift_format_lockwood_dir:
-    description: Directory where the SwiftFormat command should be run
-    required: false
-  swift_format_lockwood_extensions:
-    description: Extensions of files to check with SwiftFormat
-    required: false
-    default: "swift"
-  swift_format_lockwood_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  swift_format_official:
-    description: Enable or disable swift-format checks
-    required: false
-    default: "false"
-  swift_format_official_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  swift_format_official_dir:
-    description: Directory where the swift-format command should be run
-    required: false
-  swift_format_official_extensions:
-    description: Extrensions of files to check with swift-format
-    required: false
-    default: "swift"
-  swift_format_official_command_prefix:
-    description: Shell command to prepend to the linter command
-    required: false
-    default: ""
-
-  swiftlint:
-    description: Enable or disable SwiftLint checks
-    required: false
-    default: "false"
-  swiftlint_args:
-    description: Additional arguments to pass to the linter
-    required: false
-    default: ""
-  swiftlint_dir:
-    description: Directory where the SwiftLint command should be run
-    required: false
-  swiftlint_extensions:
-    description: Extensions of files to check with SwiftLint
-    required: false
-    default: "swift"
-  swiftlint_command_prefix:
-    description: Shell command to prepend to the linter command
     required: false
     default: ""
 

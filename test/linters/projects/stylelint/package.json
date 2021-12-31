@@ -1,8 +1,0 @@
-{
-	"name": "test-stylelint",
-	"main": "index.js",
-	"private": true,
-	"devDependencies": {
-		"stylelint": "^13.12.0"
-	}
-}

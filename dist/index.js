@@ -1275,6 +1275,1802 @@ exports.checkBypass = checkBypass;
 
 /***/ }),
 
+/***/ 2068:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+/* module decorator */ module = __nccwpck_require__.nmd(module);
+
+
+const wrapAnsi16 = (fn, offset) => (...args) => {
+	const code = fn(...args);
+	return `\u001B[${code + offset}m`;
+};
+
+const wrapAnsi256 = (fn, offset) => (...args) => {
+	const code = fn(...args);
+	return `\u001B[${38 + offset};5;${code}m`;
+};
+
+const wrapAnsi16m = (fn, offset) => (...args) => {
+	const rgb = fn(...args);
+	return `\u001B[${38 + offset};2;${rgb[0]};${rgb[1]};${rgb[2]}m`;
+};
+
+const ansi2ansi = n => n;
+const rgb2rgb = (r, g, b) => [r, g, b];
+
+const setLazyProperty = (object, property, get) => {
+	Object.defineProperty(object, property, {
+		get: () => {
+			const value = get();
+
+			Object.defineProperty(object, property, {
+				value,
+				enumerable: true,
+				configurable: true
+			});
+
+			return value;
+		},
+		enumerable: true,
+		configurable: true
+	});
+};
+
+/** @type {typeof import('color-convert')} */
+let colorConvert;
+const makeDynamicStyles = (wrap, targetSpace, identity, isBackground) => {
+	if (colorConvert === undefined) {
+		colorConvert = __nccwpck_require__(6931);
+	}
+
+	const offset = isBackground ? 10 : 0;
+	const styles = {};
+
+	for (const [sourceSpace, suite] of Object.entries(colorConvert)) {
+		const name = sourceSpace === 'ansi16' ? 'ansi' : sourceSpace;
+		if (sourceSpace === targetSpace) {
+			styles[name] = wrap(identity, offset);
+		} else if (typeof suite === 'object') {
+			styles[name] = wrap(suite[targetSpace], offset);
+		}
+	}
+
+	return styles;
+};
+
+function assembleStyles() {
+	const codes = new Map();
+	const styles = {
+		modifier: {
+			reset: [0, 0],
+			// 21 isn't widely supported and 22 does the same thing
+			bold: [1, 22],
+			dim: [2, 22],
+			italic: [3, 23],
+			underline: [4, 24],
+			inverse: [7, 27],
+			hidden: [8, 28],
+			strikethrough: [9, 29]
+		},
+		color: {
+			black: [30, 39],
+			red: [31, 39],
+			green: [32, 39],
+			yellow: [33, 39],
+			blue: [34, 39],
+			magenta: [35, 39],
+			cyan: [36, 39],
+			white: [37, 39],
+
+			// Bright color
+			blackBright: [90, 39],
+			redBright: [91, 39],
+			greenBright: [92, 39],
+			yellowBright: [93, 39],
+			blueBright: [94, 39],
+			magentaBright: [95, 39],
+			cyanBright: [96, 39],
+			whiteBright: [97, 39]
+		},
+		bgColor: {
+			bgBlack: [40, 49],
+			bgRed: [41, 49],
+			bgGreen: [42, 49],
+			bgYellow: [43, 49],
+			bgBlue: [44, 49],
+			bgMagenta: [45, 49],
+			bgCyan: [46, 49],
+			bgWhite: [47, 49],
+
+			// Bright color
+			bgBlackBright: [100, 49],
+			bgRedBright: [101, 49],
+			bgGreenBright: [102, 49],
+			bgYellowBright: [103, 49],
+			bgBlueBright: [104, 49],
+			bgMagentaBright: [105, 49],
+			bgCyanBright: [106, 49],
+			bgWhiteBright: [107, 49]
+		}
+	};
+
+	// Alias bright black as gray (and grey)
+	styles.color.gray = styles.color.blackBright;
+	styles.bgColor.bgGray = styles.bgColor.bgBlackBright;
+	styles.color.grey = styles.color.blackBright;
+	styles.bgColor.bgGrey = styles.bgColor.bgBlackBright;
+
+	for (const [groupName, group] of Object.entries(styles)) {
+		for (const [styleName, style] of Object.entries(group)) {
+			styles[styleName] = {
+				open: `\u001B[${style[0]}m`,
+				close: `\u001B[${style[1]}m`
+			};
+
+			group[styleName] = styles[styleName];
+
+			codes.set(style[0], style[1]);
+		}
+
+		Object.defineProperty(styles, groupName, {
+			value: group,
+			enumerable: false
+		});
+	}
+
+	Object.defineProperty(styles, 'codes', {
+		value: codes,
+		enumerable: false
+	});
+
+	styles.color.close = '\u001B[39m';
+	styles.bgColor.close = '\u001B[49m';
+
+	setLazyProperty(styles.color, 'ansi', () => makeDynamicStyles(wrapAnsi16, 'ansi16', ansi2ansi, false));
+	setLazyProperty(styles.color, 'ansi256', () => makeDynamicStyles(wrapAnsi256, 'ansi256', ansi2ansi, false));
+	setLazyProperty(styles.color, 'ansi16m', () => makeDynamicStyles(wrapAnsi16m, 'rgb', rgb2rgb, false));
+	setLazyProperty(styles.bgColor, 'ansi', () => makeDynamicStyles(wrapAnsi16, 'ansi16', ansi2ansi, true));
+	setLazyProperty(styles.bgColor, 'ansi256', () => makeDynamicStyles(wrapAnsi256, 'ansi256', ansi2ansi, true));
+	setLazyProperty(styles.bgColor, 'ansi16m', () => makeDynamicStyles(wrapAnsi16m, 'rgb', rgb2rgb, true));
+
+	return styles;
+}
+
+// Make the export immutable
+Object.defineProperty(module, 'exports', {
+	enumerable: true,
+	get: assembleStyles
+});
+
+
+/***/ }),
+
+/***/ 8818:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const ansiStyles = __nccwpck_require__(2068);
+const {stdout: stdoutColor, stderr: stderrColor} = __nccwpck_require__(9318);
+const {
+	stringReplaceAll,
+	stringEncaseCRLFWithFirstIndex
+} = __nccwpck_require__(2415);
+
+const {isArray} = Array;
+
+// `supportsColor.level` → `ansiStyles.color[name]` mapping
+const levelMapping = [
+	'ansi',
+	'ansi',
+	'ansi256',
+	'ansi16m'
+];
+
+const styles = Object.create(null);
+
+const applyOptions = (object, options = {}) => {
+	if (options.level && !(Number.isInteger(options.level) && options.level >= 0 && options.level <= 3)) {
+		throw new Error('The `level` option should be an integer from 0 to 3');
+	}
+
+	// Detect level if not set manually
+	const colorLevel = stdoutColor ? stdoutColor.level : 0;
+	object.level = options.level === undefined ? colorLevel : options.level;
+};
+
+class ChalkClass {
+	constructor(options) {
+		// eslint-disable-next-line no-constructor-return
+		return chalkFactory(options);
+	}
+}
+
+const chalkFactory = options => {
+	const chalk = {};
+	applyOptions(chalk, options);
+
+	chalk.template = (...arguments_) => chalkTag(chalk.template, ...arguments_);
+
+	Object.setPrototypeOf(chalk, Chalk.prototype);
+	Object.setPrototypeOf(chalk.template, chalk);
+
+	chalk.template.constructor = () => {
+		throw new Error('`chalk.constructor()` is deprecated. Use `new chalk.Instance()` instead.');
+	};
+
+	chalk.template.Instance = ChalkClass;
+
+	return chalk.template;
+};
+
+function Chalk(options) {
+	return chalkFactory(options);
+}
+
+for (const [styleName, style] of Object.entries(ansiStyles)) {
+	styles[styleName] = {
+		get() {
+			const builder = createBuilder(this, createStyler(style.open, style.close, this._styler), this._isEmpty);
+			Object.defineProperty(this, styleName, {value: builder});
+			return builder;
+		}
+	};
+}
+
+styles.visible = {
+	get() {
+		const builder = createBuilder(this, this._styler, true);
+		Object.defineProperty(this, 'visible', {value: builder});
+		return builder;
+	}
+};
+
+const usedModels = ['rgb', 'hex', 'keyword', 'hsl', 'hsv', 'hwb', 'ansi', 'ansi256'];
+
+for (const model of usedModels) {
+	styles[model] = {
+		get() {
+			const {level} = this;
+			return function (...arguments_) {
+				const styler = createStyler(ansiStyles.color[levelMapping[level]][model](...arguments_), ansiStyles.color.close, this._styler);
+				return createBuilder(this, styler, this._isEmpty);
+			};
+		}
+	};
+}
+
+for (const model of usedModels) {
+	const bgModel = 'bg' + model[0].toUpperCase() + model.slice(1);
+	styles[bgModel] = {
+		get() {
+			const {level} = this;
+			return function (...arguments_) {
+				const styler = createStyler(ansiStyles.bgColor[levelMapping[level]][model](...arguments_), ansiStyles.bgColor.close, this._styler);
+				return createBuilder(this, styler, this._isEmpty);
+			};
+		}
+	};
+}
+
+const proto = Object.defineProperties(() => {}, {
+	...styles,
+	level: {
+		enumerable: true,
+		get() {
+			return this._generator.level;
+		},
+		set(level) {
+			this._generator.level = level;
+		}
+	}
+});
+
+const createStyler = (open, close, parent) => {
+	let openAll;
+	let closeAll;
+	if (parent === undefined) {
+		openAll = open;
+		closeAll = close;
+	} else {
+		openAll = parent.openAll + open;
+		closeAll = close + parent.closeAll;
+	}
+
+	return {
+		open,
+		close,
+		openAll,
+		closeAll,
+		parent
+	};
+};
+
+const createBuilder = (self, _styler, _isEmpty) => {
+	const builder = (...arguments_) => {
+		if (isArray(arguments_[0]) && isArray(arguments_[0].raw)) {
+			// Called as a template literal, for example: chalk.red`2 + 3 = {bold ${2+3}}`
+			return applyStyle(builder, chalkTag(builder, ...arguments_));
+		}
+
+		// Single argument is hot path, implicit coercion is faster than anything
+		// eslint-disable-next-line no-implicit-coercion
+		return applyStyle(builder, (arguments_.length === 1) ? ('' + arguments_[0]) : arguments_.join(' '));
+	};
+
+	// We alter the prototype because we must return a function, but there is
+	// no way to create a function with a different prototype
+	Object.setPrototypeOf(builder, proto);
+
+	builder._generator = self;
+	builder._styler = _styler;
+	builder._isEmpty = _isEmpty;
+
+	return builder;
+};
+
+const applyStyle = (self, string) => {
+	if (self.level <= 0 || !string) {
+		return self._isEmpty ? '' : string;
+	}
+
+	let styler = self._styler;
+
+	if (styler === undefined) {
+		return string;
+	}
+
+	const {openAll, closeAll} = styler;
+	if (string.indexOf('\u001B') !== -1) {
+		while (styler !== undefined) {
+			// Replace any instances already present with a re-opening code
+			// otherwise only the part of the string until said closing code
+			// will be colored, and the rest will simply be 'plain'.
+			string = stringReplaceAll(string, styler.close, styler.open);
+
+			styler = styler.parent;
+		}
+	}
+
+	// We can move both next actions out of loop, because remaining actions in loop won't have
+	// any/visible effect on parts we add here. Close the styling before a linebreak and reopen
+	// after next line to fix a bleed issue on macOS: https://github.com/chalk/chalk/pull/92
+	const lfIndex = string.indexOf('\n');
+	if (lfIndex !== -1) {
+		string = stringEncaseCRLFWithFirstIndex(string, closeAll, openAll, lfIndex);
+	}
+
+	return openAll + string + closeAll;
+};
+
+let template;
+const chalkTag = (chalk, ...strings) => {
+	const [firstString] = strings;
+
+	if (!isArray(firstString) || !isArray(firstString.raw)) {
+		// If chalk() was called by itself or with a string,
+		// return the string itself as a string.
+		return strings.join(' ');
+	}
+
+	const arguments_ = strings.slice(1);
+	const parts = [firstString.raw[0]];
+
+	for (let i = 1; i < firstString.length; i++) {
+		parts.push(
+			String(arguments_[i - 1]).replace(/[{}\\]/g, '\\$&'),
+			String(firstString.raw[i])
+		);
+	}
+
+	if (template === undefined) {
+		template = __nccwpck_require__(500);
+	}
+
+	return template(chalk, parts.join(''));
+};
+
+Object.defineProperties(Chalk.prototype, styles);
+
+const chalk = Chalk(); // eslint-disable-line new-cap
+chalk.supportsColor = stdoutColor;
+chalk.stderr = Chalk({level: stderrColor ? stderrColor.level : 0}); // eslint-disable-line new-cap
+chalk.stderr.supportsColor = stderrColor;
+
+module.exports = chalk;
+
+
+/***/ }),
+
+/***/ 500:
+/***/ ((module) => {
+
+"use strict";
+
+const TEMPLATE_REGEX = /(?:\\(u(?:[a-f\d]{4}|\{[a-f\d]{1,6}\})|x[a-f\d]{2}|.))|(?:\{(~)?(\w+(?:\([^)]*\))?(?:\.\w+(?:\([^)]*\))?)*)(?:[ \t]|(?=\r?\n)))|(\})|((?:.|[\r\n\f])+?)/gi;
+const STYLE_REGEX = /(?:^|\.)(\w+)(?:\(([^)]*)\))?/g;
+const STRING_REGEX = /^(['"])((?:\\.|(?!\1)[^\\])*)\1$/;
+const ESCAPE_REGEX = /\\(u(?:[a-f\d]{4}|{[a-f\d]{1,6}})|x[a-f\d]{2}|.)|([^\\])/gi;
+
+const ESCAPES = new Map([
+	['n', '\n'],
+	['r', '\r'],
+	['t', '\t'],
+	['b', '\b'],
+	['f', '\f'],
+	['v', '\v'],
+	['0', '\0'],
+	['\\', '\\'],
+	['e', '\u001B'],
+	['a', '\u0007']
+]);
+
+function unescape(c) {
+	const u = c[0] === 'u';
+	const bracket = c[1] === '{';
+
+	if ((u && !bracket && c.length === 5) || (c[0] === 'x' && c.length === 3)) {
+		return String.fromCharCode(parseInt(c.slice(1), 16));
+	}
+
+	if (u && bracket) {
+		return String.fromCodePoint(parseInt(c.slice(2, -1), 16));
+	}
+
+	return ESCAPES.get(c) || c;
+}
+
+function parseArguments(name, arguments_) {
+	const results = [];
+	const chunks = arguments_.trim().split(/\s*,\s*/g);
+	let matches;
+
+	for (const chunk of chunks) {
+		const number = Number(chunk);
+		if (!Number.isNaN(number)) {
+			results.push(number);
+		} else if ((matches = chunk.match(STRING_REGEX))) {
+			results.push(matches[2].replace(ESCAPE_REGEX, (m, escape, character) => escape ? unescape(escape) : character));
+		} else {
+			throw new Error(`Invalid Chalk template style argument: ${chunk} (in style '${name}')`);
+		}
+	}
+
+	return results;
+}
+
+function parseStyle(style) {
+	STYLE_REGEX.lastIndex = 0;
+
+	const results = [];
+	let matches;
+
+	while ((matches = STYLE_REGEX.exec(style)) !== null) {
+		const name = matches[1];
+
+		if (matches[2]) {
+			const args = parseArguments(name, matches[2]);
+			results.push([name].concat(args));
+		} else {
+			results.push([name]);
+		}
+	}
+
+	return results;
+}
+
+function buildStyle(chalk, styles) {
+	const enabled = {};
+
+	for (const layer of styles) {
+		for (const style of layer.styles) {
+			enabled[style[0]] = layer.inverse ? null : style.slice(1);
+		}
+	}
+
+	let current = chalk;
+	for (const [styleName, styles] of Object.entries(enabled)) {
+		if (!Array.isArray(styles)) {
+			continue;
+		}
+
+		if (!(styleName in current)) {
+			throw new Error(`Unknown Chalk style: ${styleName}`);
+		}
+
+		current = styles.length > 0 ? current[styleName](...styles) : current[styleName];
+	}
+
+	return current;
+}
+
+module.exports = (chalk, temporary) => {
+	const styles = [];
+	const chunks = [];
+	let chunk = [];
+
+	// eslint-disable-next-line max-params
+	temporary.replace(TEMPLATE_REGEX, (m, escapeCharacter, inverse, style, close, character) => {
+		if (escapeCharacter) {
+			chunk.push(unescape(escapeCharacter));
+		} else if (style) {
+			const string = chunk.join('');
+			chunk = [];
+			chunks.push(styles.length === 0 ? string : buildStyle(chalk, styles)(string));
+			styles.push({inverse, styles: parseStyle(style)});
+		} else if (close) {
+			if (styles.length === 0) {
+				throw new Error('Found extraneous } in Chalk template literal');
+			}
+
+			chunks.push(buildStyle(chalk, styles)(chunk.join('')));
+			chunk = [];
+			styles.pop();
+		} else {
+			chunk.push(character);
+		}
+	});
+
+	chunks.push(chunk.join(''));
+
+	if (styles.length > 0) {
+		const errMessage = `Chalk template literal is missing ${styles.length} closing bracket${styles.length === 1 ? '' : 's'} (\`}\`)`;
+		throw new Error(errMessage);
+	}
+
+	return chunks.join('');
+};
+
+
+/***/ }),
+
+/***/ 2415:
+/***/ ((module) => {
+
+"use strict";
+
+
+const stringReplaceAll = (string, substring, replacer) => {
+	let index = string.indexOf(substring);
+	if (index === -1) {
+		return string;
+	}
+
+	const substringLength = substring.length;
+	let endIndex = 0;
+	let returnValue = '';
+	do {
+		returnValue += string.substr(endIndex, index - endIndex) + substring + replacer;
+		endIndex = index + substringLength;
+		index = string.indexOf(substring, endIndex);
+	} while (index !== -1);
+
+	returnValue += string.substr(endIndex);
+	return returnValue;
+};
+
+const stringEncaseCRLFWithFirstIndex = (string, prefix, postfix, index) => {
+	let endIndex = 0;
+	let returnValue = '';
+	do {
+		const gotCR = string[index - 1] === '\r';
+		returnValue += string.substr(endIndex, (gotCR ? index - 1 : index) - endIndex) + prefix + (gotCR ? '\r\n' : '\n') + postfix;
+		endIndex = index + 1;
+		index = string.indexOf('\n', endIndex);
+	} while (index !== -1);
+
+	returnValue += string.substr(endIndex);
+	return returnValue;
+};
+
+module.exports = {
+	stringReplaceAll,
+	stringEncaseCRLFWithFirstIndex
+};
+
+
+/***/ }),
+
+/***/ 7391:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+/* MIT license */
+/* eslint-disable no-mixed-operators */
+const cssKeywords = __nccwpck_require__(8510);
+
+// NOTE: conversions should only return primitive values (i.e. arrays, or
+//       values that give correct `typeof` results).
+//       do not use box values types (i.e. Number(), String(), etc.)
+
+const reverseKeywords = {};
+for (const key of Object.keys(cssKeywords)) {
+	reverseKeywords[cssKeywords[key]] = key;
+}
+
+const convert = {
+	rgb: {channels: 3, labels: 'rgb'},
+	hsl: {channels: 3, labels: 'hsl'},
+	hsv: {channels: 3, labels: 'hsv'},
+	hwb: {channels: 3, labels: 'hwb'},
+	cmyk: {channels: 4, labels: 'cmyk'},
+	xyz: {channels: 3, labels: 'xyz'},
+	lab: {channels: 3, labels: 'lab'},
+	lch: {channels: 3, labels: 'lch'},
+	hex: {channels: 1, labels: ['hex']},
+	keyword: {channels: 1, labels: ['keyword']},
+	ansi16: {channels: 1, labels: ['ansi16']},
+	ansi256: {channels: 1, labels: ['ansi256']},
+	hcg: {channels: 3, labels: ['h', 'c', 'g']},
+	apple: {channels: 3, labels: ['r16', 'g16', 'b16']},
+	gray: {channels: 1, labels: ['gray']}
+};
+
+module.exports = convert;
+
+// Hide .channels and .labels properties
+for (const model of Object.keys(convert)) {
+	if (!('channels' in convert[model])) {
+		throw new Error('missing channels property: ' + model);
+	}
+
+	if (!('labels' in convert[model])) {
+		throw new Error('missing channel labels property: ' + model);
+	}
+
+	if (convert[model].labels.length !== convert[model].channels) {
+		throw new Error('channel and label counts mismatch: ' + model);
+	}
+
+	const {channels, labels} = convert[model];
+	delete convert[model].channels;
+	delete convert[model].labels;
+	Object.defineProperty(convert[model], 'channels', {value: channels});
+	Object.defineProperty(convert[model], 'labels', {value: labels});
+}
+
+convert.rgb.hsl = function (rgb) {
+	const r = rgb[0] / 255;
+	const g = rgb[1] / 255;
+	const b = rgb[2] / 255;
+	const min = Math.min(r, g, b);
+	const max = Math.max(r, g, b);
+	const delta = max - min;
+	let h;
+	let s;
+
+	if (max === min) {
+		h = 0;
+	} else if (r === max) {
+		h = (g - b) / delta;
+	} else if (g === max) {
+		h = 2 + (b - r) / delta;
+	} else if (b === max) {
+		h = 4 + (r - g) / delta;
+	}
+
+	h = Math.min(h * 60, 360);
+
+	if (h < 0) {
+		h += 360;
+	}
+
+	const l = (min + max) / 2;
+
+	if (max === min) {
+		s = 0;
+	} else if (l <= 0.5) {
+		s = delta / (max + min);
+	} else {
+		s = delta / (2 - max - min);
+	}
+
+	return [h, s * 100, l * 100];
+};
+
+convert.rgb.hsv = function (rgb) {
+	let rdif;
+	let gdif;
+	let bdif;
+	let h;
+	let s;
+
+	const r = rgb[0] / 255;
+	const g = rgb[1] / 255;
+	const b = rgb[2] / 255;
+	const v = Math.max(r, g, b);
+	const diff = v - Math.min(r, g, b);
+	const diffc = function (c) {
+		return (v - c) / 6 / diff + 1 / 2;
+	};
+
+	if (diff === 0) {
+		h = 0;
+		s = 0;
+	} else {
+		s = diff / v;
+		rdif = diffc(r);
+		gdif = diffc(g);
+		bdif = diffc(b);
+
+		if (r === v) {
+			h = bdif - gdif;
+		} else if (g === v) {
+			h = (1 / 3) + rdif - bdif;
+		} else if (b === v) {
+			h = (2 / 3) + gdif - rdif;
+		}
+
+		if (h < 0) {
+			h += 1;
+		} else if (h > 1) {
+			h -= 1;
+		}
+	}
+
+	return [
+		h * 360,
+		s * 100,
+		v * 100
+	];
+};
+
+convert.rgb.hwb = function (rgb) {
+	const r = rgb[0];
+	const g = rgb[1];
+	let b = rgb[2];
+	const h = convert.rgb.hsl(rgb)[0];
+	const w = 1 / 255 * Math.min(r, Math.min(g, b));
+
+	b = 1 - 1 / 255 * Math.max(r, Math.max(g, b));
+
+	return [h, w * 100, b * 100];
+};
+
+convert.rgb.cmyk = function (rgb) {
+	const r = rgb[0] / 255;
+	const g = rgb[1] / 255;
+	const b = rgb[2] / 255;
+
+	const k = Math.min(1 - r, 1 - g, 1 - b);
+	const c = (1 - r - k) / (1 - k) || 0;
+	const m = (1 - g - k) / (1 - k) || 0;
+	const y = (1 - b - k) / (1 - k) || 0;
+
+	return [c * 100, m * 100, y * 100, k * 100];
+};
+
+function comparativeDistance(x, y) {
+	/*
+		See https://en.m.wikipedia.org/wiki/Euclidean_distance#Squared_Euclidean_distance
+	*/
+	return (
+		((x[0] - y[0]) ** 2) +
+		((x[1] - y[1]) ** 2) +
+		((x[2] - y[2]) ** 2)
+	);
+}
+
+convert.rgb.keyword = function (rgb) {
+	const reversed = reverseKeywords[rgb];
+	if (reversed) {
+		return reversed;
+	}
+
+	let currentClosestDistance = Infinity;
+	let currentClosestKeyword;
+
+	for (const keyword of Object.keys(cssKeywords)) {
+		const value = cssKeywords[keyword];
+
+		// Compute comparative distance
+		const distance = comparativeDistance(rgb, value);
+
+		// Check if its less, if so set as closest
+		if (distance < currentClosestDistance) {
+			currentClosestDistance = distance;
+			currentClosestKeyword = keyword;
+		}
+	}
+
+	return currentClosestKeyword;
+};
+
+convert.keyword.rgb = function (keyword) {
+	return cssKeywords[keyword];
+};
+
+convert.rgb.xyz = function (rgb) {
+	let r = rgb[0] / 255;
+	let g = rgb[1] / 255;
+	let b = rgb[2] / 255;
+
+	// Assume sRGB
+	r = r > 0.04045 ? (((r + 0.055) / 1.055) ** 2.4) : (r / 12.92);
+	g = g > 0.04045 ? (((g + 0.055) / 1.055) ** 2.4) : (g / 12.92);
+	b = b > 0.04045 ? (((b + 0.055) / 1.055) ** 2.4) : (b / 12.92);
+
+	const x = (r * 0.4124) + (g * 0.3576) + (b * 0.1805);
+	const y = (r * 0.2126) + (g * 0.7152) + (b * 0.0722);
+	const z = (r * 0.0193) + (g * 0.1192) + (b * 0.9505);
+
+	return [x * 100, y * 100, z * 100];
+};
+
+convert.rgb.lab = function (rgb) {
+	const xyz = convert.rgb.xyz(rgb);
+	let x = xyz[0];
+	let y = xyz[1];
+	let z = xyz[2];
+
+	x /= 95.047;
+	y /= 100;
+	z /= 108.883;
+
+	x = x > 0.008856 ? (x ** (1 / 3)) : (7.787 * x) + (16 / 116);
+	y = y > 0.008856 ? (y ** (1 / 3)) : (7.787 * y) + (16 / 116);
+	z = z > 0.008856 ? (z ** (1 / 3)) : (7.787 * z) + (16 / 116);
+
+	const l = (116 * y) - 16;
+	const a = 500 * (x - y);
+	const b = 200 * (y - z);
+
+	return [l, a, b];
+};
+
+convert.hsl.rgb = function (hsl) {
+	const h = hsl[0] / 360;
+	const s = hsl[1] / 100;
+	const l = hsl[2] / 100;
+	let t2;
+	let t3;
+	let val;
+
+	if (s === 0) {
+		val = l * 255;
+		return [val, val, val];
+	}
+
+	if (l < 0.5) {
+		t2 = l * (1 + s);
+	} else {
+		t2 = l + s - l * s;
+	}
+
+	const t1 = 2 * l - t2;
+
+	const rgb = [0, 0, 0];
+	for (let i = 0; i < 3; i++) {
+		t3 = h + 1 / 3 * -(i - 1);
+		if (t3 < 0) {
+			t3++;
+		}
+
+		if (t3 > 1) {
+			t3--;
+		}
+
+		if (6 * t3 < 1) {
+			val = t1 + (t2 - t1) * 6 * t3;
+		} else if (2 * t3 < 1) {
+			val = t2;
+		} else if (3 * t3 < 2) {
+			val = t1 + (t2 - t1) * (2 / 3 - t3) * 6;
+		} else {
+			val = t1;
+		}
+
+		rgb[i] = val * 255;
+	}
+
+	return rgb;
+};
+
+convert.hsl.hsv = function (hsl) {
+	const h = hsl[0];
+	let s = hsl[1] / 100;
+	let l = hsl[2] / 100;
+	let smin = s;
+	const lmin = Math.max(l, 0.01);
+
+	l *= 2;
+	s *= (l <= 1) ? l : 2 - l;
+	smin *= lmin <= 1 ? lmin : 2 - lmin;
+	const v = (l + s) / 2;
+	const sv = l === 0 ? (2 * smin) / (lmin + smin) : (2 * s) / (l + s);
+
+	return [h, sv * 100, v * 100];
+};
+
+convert.hsv.rgb = function (hsv) {
+	const h = hsv[0] / 60;
+	const s = hsv[1] / 100;
+	let v = hsv[2] / 100;
+	const hi = Math.floor(h) % 6;
+
+	const f = h - Math.floor(h);
+	const p = 255 * v * (1 - s);
+	const q = 255 * v * (1 - (s * f));
+	const t = 255 * v * (1 - (s * (1 - f)));
+	v *= 255;
+
+	switch (hi) {
+		case 0:
+			return [v, t, p];
+		case 1:
+			return [q, v, p];
+		case 2:
+			return [p, v, t];
+		case 3:
+			return [p, q, v];
+		case 4:
+			return [t, p, v];
+		case 5:
+			return [v, p, q];
+	}
+};
+
+convert.hsv.hsl = function (hsv) {
+	const h = hsv[0];
+	const s = hsv[1] / 100;
+	const v = hsv[2] / 100;
+	const vmin = Math.max(v, 0.01);
+	let sl;
+	let l;
+
+	l = (2 - s) * v;
+	const lmin = (2 - s) * vmin;
+	sl = s * vmin;
+	sl /= (lmin <= 1) ? lmin : 2 - lmin;
+	sl = sl || 0;
+	l /= 2;
+
+	return [h, sl * 100, l * 100];
+};
+
+// http://dev.w3.org/csswg/css-color/#hwb-to-rgb
+convert.hwb.rgb = function (hwb) {
+	const h = hwb[0] / 360;
+	let wh = hwb[1] / 100;
+	let bl = hwb[2] / 100;
+	const ratio = wh + bl;
+	let f;
+
+	// Wh + bl cant be > 1
+	if (ratio > 1) {
+		wh /= ratio;
+		bl /= ratio;
+	}
+
+	const i = Math.floor(6 * h);
+	const v = 1 - bl;
+	f = 6 * h - i;
+
+	if ((i & 0x01) !== 0) {
+		f = 1 - f;
+	}
+
+	const n = wh + f * (v - wh); // Linear interpolation
+
+	let r;
+	let g;
+	let b;
+	/* eslint-disable max-statements-per-line,no-multi-spaces */
+	switch (i) {
+		default:
+		case 6:
+		case 0: r = v;  g = n;  b = wh; break;
+		case 1: r = n;  g = v;  b = wh; break;
+		case 2: r = wh; g = v;  b = n; break;
+		case 3: r = wh; g = n;  b = v; break;
+		case 4: r = n;  g = wh; b = v; break;
+		case 5: r = v;  g = wh; b = n; break;
+	}
+	/* eslint-enable max-statements-per-line,no-multi-spaces */
+
+	return [r * 255, g * 255, b * 255];
+};
+
+convert.cmyk.rgb = function (cmyk) {
+	const c = cmyk[0] / 100;
+	const m = cmyk[1] / 100;
+	const y = cmyk[2] / 100;
+	const k = cmyk[3] / 100;
+
+	const r = 1 - Math.min(1, c * (1 - k) + k);
+	const g = 1 - Math.min(1, m * (1 - k) + k);
+	const b = 1 - Math.min(1, y * (1 - k) + k);
+
+	return [r * 255, g * 255, b * 255];
+};
+
+convert.xyz.rgb = function (xyz) {
+	const x = xyz[0] / 100;
+	const y = xyz[1] / 100;
+	const z = xyz[2] / 100;
+	let r;
+	let g;
+	let b;
+
+	r = (x * 3.2406) + (y * -1.5372) + (z * -0.4986);
+	g = (x * -0.9689) + (y * 1.8758) + (z * 0.0415);
+	b = (x * 0.0557) + (y * -0.2040) + (z * 1.0570);
+
+	// Assume sRGB
+	r = r > 0.0031308
+		? ((1.055 * (r ** (1.0 / 2.4))) - 0.055)
+		: r * 12.92;
+
+	g = g > 0.0031308
+		? ((1.055 * (g ** (1.0 / 2.4))) - 0.055)
+		: g * 12.92;
+
+	b = b > 0.0031308
+		? ((1.055 * (b ** (1.0 / 2.4))) - 0.055)
+		: b * 12.92;
+
+	r = Math.min(Math.max(0, r), 1);
+	g = Math.min(Math.max(0, g), 1);
+	b = Math.min(Math.max(0, b), 1);
+
+	return [r * 255, g * 255, b * 255];
+};
+
+convert.xyz.lab = function (xyz) {
+	let x = xyz[0];
+	let y = xyz[1];
+	let z = xyz[2];
+
+	x /= 95.047;
+	y /= 100;
+	z /= 108.883;
+
+	x = x > 0.008856 ? (x ** (1 / 3)) : (7.787 * x) + (16 / 116);
+	y = y > 0.008856 ? (y ** (1 / 3)) : (7.787 * y) + (16 / 116);
+	z = z > 0.008856 ? (z ** (1 / 3)) : (7.787 * z) + (16 / 116);
+
+	const l = (116 * y) - 16;
+	const a = 500 * (x - y);
+	const b = 200 * (y - z);
+
+	return [l, a, b];
+};
+
+convert.lab.xyz = function (lab) {
+	const l = lab[0];
+	const a = lab[1];
+	const b = lab[2];
+	let x;
+	let y;
+	let z;
+
+	y = (l + 16) / 116;
+	x = a / 500 + y;
+	z = y - b / 200;
+
+	const y2 = y ** 3;
+	const x2 = x ** 3;
+	const z2 = z ** 3;
+	y = y2 > 0.008856 ? y2 : (y - 16 / 116) / 7.787;
+	x = x2 > 0.008856 ? x2 : (x - 16 / 116) / 7.787;
+	z = z2 > 0.008856 ? z2 : (z - 16 / 116) / 7.787;
+
+	x *= 95.047;
+	y *= 100;
+	z *= 108.883;
+
+	return [x, y, z];
+};
+
+convert.lab.lch = function (lab) {
+	const l = lab[0];
+	const a = lab[1];
+	const b = lab[2];
+	let h;
+
+	const hr = Math.atan2(b, a);
+	h = hr * 360 / 2 / Math.PI;
+
+	if (h < 0) {
+		h += 360;
+	}
+
+	const c = Math.sqrt(a * a + b * b);
+
+	return [l, c, h];
+};
+
+convert.lch.lab = function (lch) {
+	const l = lch[0];
+	const c = lch[1];
+	const h = lch[2];
+
+	const hr = h / 360 * 2 * Math.PI;
+	const a = c * Math.cos(hr);
+	const b = c * Math.sin(hr);
+
+	return [l, a, b];
+};
+
+convert.rgb.ansi16 = function (args, saturation = null) {
+	const [r, g, b] = args;
+	let value = saturation === null ? convert.rgb.hsv(args)[2] : saturation; // Hsv -> ansi16 optimization
+
+	value = Math.round(value / 50);
+
+	if (value === 0) {
+		return 30;
+	}
+
+	let ansi = 30
+		+ ((Math.round(b / 255) << 2)
+		| (Math.round(g / 255) << 1)
+		| Math.round(r / 255));
+
+	if (value === 2) {
+		ansi += 60;
+	}
+
+	return ansi;
+};
+
+convert.hsv.ansi16 = function (args) {
+	// Optimization here; we already know the value and don't need to get
+	// it converted for us.
+	return convert.rgb.ansi16(convert.hsv.rgb(args), args[2]);
+};
+
+convert.rgb.ansi256 = function (args) {
+	const r = args[0];
+	const g = args[1];
+	const b = args[2];
+
+	// We use the extended greyscale palette here, with the exception of
+	// black and white. normal palette only has 4 greyscale shades.
+	if (r === g && g === b) {
+		if (r < 8) {
+			return 16;
+		}
+
+		if (r > 248) {
+			return 231;
+		}
+
+		return Math.round(((r - 8) / 247) * 24) + 232;
+	}
+
+	const ansi = 16
+		+ (36 * Math.round(r / 255 * 5))
+		+ (6 * Math.round(g / 255 * 5))
+		+ Math.round(b / 255 * 5);
+
+	return ansi;
+};
+
+convert.ansi16.rgb = function (args) {
+	let color = args % 10;
+
+	// Handle greyscale
+	if (color === 0 || color === 7) {
+		if (args > 50) {
+			color += 3.5;
+		}
+
+		color = color / 10.5 * 255;
+
+		return [color, color, color];
+	}
+
+	const mult = (~~(args > 50) + 1) * 0.5;
+	const r = ((color & 1) * mult) * 255;
+	const g = (((color >> 1) & 1) * mult) * 255;
+	const b = (((color >> 2) & 1) * mult) * 255;
+
+	return [r, g, b];
+};
+
+convert.ansi256.rgb = function (args) {
+	// Handle greyscale
+	if (args >= 232) {
+		const c = (args - 232) * 10 + 8;
+		return [c, c, c];
+	}
+
+	args -= 16;
+
+	let rem;
+	const r = Math.floor(args / 36) / 5 * 255;
+	const g = Math.floor((rem = args % 36) / 6) / 5 * 255;
+	const b = (rem % 6) / 5 * 255;
+
+	return [r, g, b];
+};
+
+convert.rgb.hex = function (args) {
+	const integer = ((Math.round(args[0]) & 0xFF) << 16)
+		+ ((Math.round(args[1]) & 0xFF) << 8)
+		+ (Math.round(args[2]) & 0xFF);
+
+	const string = integer.toString(16).toUpperCase();
+	return '000000'.substring(string.length) + string;
+};
+
+convert.hex.rgb = function (args) {
+	const match = args.toString(16).match(/[a-f0-9]{6}|[a-f0-9]{3}/i);
+	if (!match) {
+		return [0, 0, 0];
+	}
+
+	let colorString = match[0];
+
+	if (match[0].length === 3) {
+		colorString = colorString.split('').map(char => {
+			return char + char;
+		}).join('');
+	}
+
+	const integer = parseInt(colorString, 16);
+	const r = (integer >> 16) & 0xFF;
+	const g = (integer >> 8) & 0xFF;
+	const b = integer & 0xFF;
+
+	return [r, g, b];
+};
+
+convert.rgb.hcg = function (rgb) {
+	const r = rgb[0] / 255;
+	const g = rgb[1] / 255;
+	const b = rgb[2] / 255;
+	const max = Math.max(Math.max(r, g), b);
+	const min = Math.min(Math.min(r, g), b);
+	const chroma = (max - min);
+	let grayscale;
+	let hue;
+
+	if (chroma < 1) {
+		grayscale = min / (1 - chroma);
+	} else {
+		grayscale = 0;
+	}
+
+	if (chroma <= 0) {
+		hue = 0;
+	} else
+	if (max === r) {
+		hue = ((g - b) / chroma) % 6;
+	} else
+	if (max === g) {
+		hue = 2 + (b - r) / chroma;
+	} else {
+		hue = 4 + (r - g) / chroma;
+	}
+
+	hue /= 6;
+	hue %= 1;
+
+	return [hue * 360, chroma * 100, grayscale * 100];
+};
+
+convert.hsl.hcg = function (hsl) {
+	const s = hsl[1] / 100;
+	const l = hsl[2] / 100;
+
+	const c = l < 0.5 ? (2.0 * s * l) : (2.0 * s * (1.0 - l));
+
+	let f = 0;
+	if (c < 1.0) {
+		f = (l - 0.5 * c) / (1.0 - c);
+	}
+
+	return [hsl[0], c * 100, f * 100];
+};
+
+convert.hsv.hcg = function (hsv) {
+	const s = hsv[1] / 100;
+	const v = hsv[2] / 100;
+
+	const c = s * v;
+	let f = 0;
+
+	if (c < 1.0) {
+		f = (v - c) / (1 - c);
+	}
+
+	return [hsv[0], c * 100, f * 100];
+};
+
+convert.hcg.rgb = function (hcg) {
+	const h = hcg[0] / 360;
+	const c = hcg[1] / 100;
+	const g = hcg[2] / 100;
+
+	if (c === 0.0) {
+		return [g * 255, g * 255, g * 255];
+	}
+
+	const pure = [0, 0, 0];
+	const hi = (h % 1) * 6;
+	const v = hi % 1;
+	const w = 1 - v;
+	let mg = 0;
+
+	/* eslint-disable max-statements-per-line */
+	switch (Math.floor(hi)) {
+		case 0:
+			pure[0] = 1; pure[1] = v; pure[2] = 0; break;
+		case 1:
+			pure[0] = w; pure[1] = 1; pure[2] = 0; break;
+		case 2:
+			pure[0] = 0; pure[1] = 1; pure[2] = v; break;
+		case 3:
+			pure[0] = 0; pure[1] = w; pure[2] = 1; break;
+		case 4:
+			pure[0] = v; pure[1] = 0; pure[2] = 1; break;
+		default:
+			pure[0] = 1; pure[1] = 0; pure[2] = w;
+	}
+	/* eslint-enable max-statements-per-line */
+
+	mg = (1.0 - c) * g;
+
+	return [
+		(c * pure[0] + mg) * 255,
+		(c * pure[1] + mg) * 255,
+		(c * pure[2] + mg) * 255
+	];
+};
+
+convert.hcg.hsv = function (hcg) {
+	const c = hcg[1] / 100;
+	const g = hcg[2] / 100;
+
+	const v = c + g * (1.0 - c);
+	let f = 0;
+
+	if (v > 0.0) {
+		f = c / v;
+	}
+
+	return [hcg[0], f * 100, v * 100];
+};
+
+convert.hcg.hsl = function (hcg) {
+	const c = hcg[1] / 100;
+	const g = hcg[2] / 100;
+
+	const l = g * (1.0 - c) + 0.5 * c;
+	let s = 0;
+
+	if (l > 0.0 && l < 0.5) {
+		s = c / (2 * l);
+	} else
+	if (l >= 0.5 && l < 1.0) {
+		s = c / (2 * (1 - l));
+	}
+
+	return [hcg[0], s * 100, l * 100];
+};
+
+convert.hcg.hwb = function (hcg) {
+	const c = hcg[1] / 100;
+	const g = hcg[2] / 100;
+	const v = c + g * (1.0 - c);
+	return [hcg[0], (v - c) * 100, (1 - v) * 100];
+};
+
+convert.hwb.hcg = function (hwb) {
+	const w = hwb[1] / 100;
+	const b = hwb[2] / 100;
+	const v = 1 - b;
+	const c = v - w;
+	let g = 0;
+
+	if (c < 1) {
+		g = (v - c) / (1 - c);
+	}
+
+	return [hwb[0], c * 100, g * 100];
+};
+
+convert.apple.rgb = function (apple) {
+	return [(apple[0] / 65535) * 255, (apple[1] / 65535) * 255, (apple[2] / 65535) * 255];
+};
+
+convert.rgb.apple = function (rgb) {
+	return [(rgb[0] / 255) * 65535, (rgb[1] / 255) * 65535, (rgb[2] / 255) * 65535];
+};
+
+convert.gray.rgb = function (args) {
+	return [args[0] / 100 * 255, args[0] / 100 * 255, args[0] / 100 * 255];
+};
+
+convert.gray.hsl = function (args) {
+	return [0, 0, args[0]];
+};
+
+convert.gray.hsv = convert.gray.hsl;
+
+convert.gray.hwb = function (gray) {
+	return [0, 100, gray[0]];
+};
+
+convert.gray.cmyk = function (gray) {
+	return [0, 0, 0, gray[0]];
+};
+
+convert.gray.lab = function (gray) {
+	return [gray[0], 0, 0];
+};
+
+convert.gray.hex = function (gray) {
+	const val = Math.round(gray[0] / 100 * 255) & 0xFF;
+	const integer = (val << 16) + (val << 8) + val;
+
+	const string = integer.toString(16).toUpperCase();
+	return '000000'.substring(string.length) + string;
+};
+
+convert.rgb.gray = function (rgb) {
+	const val = (rgb[0] + rgb[1] + rgb[2]) / 3;
+	return [val / 255 * 100];
+};
+
+
+/***/ }),
+
+/***/ 6931:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const conversions = __nccwpck_require__(7391);
+const route = __nccwpck_require__(880);
+
+const convert = {};
+
+const models = Object.keys(conversions);
+
+function wrapRaw(fn) {
+	const wrappedFn = function (...args) {
+		const arg0 = args[0];
+		if (arg0 === undefined || arg0 === null) {
+			return arg0;
+		}
+
+		if (arg0.length > 1) {
+			args = arg0;
+		}
+
+		return fn(args);
+	};
+
+	// Preserve .conversion property if there is one
+	if ('conversion' in fn) {
+		wrappedFn.conversion = fn.conversion;
+	}
+
+	return wrappedFn;
+}
+
+function wrapRounded(fn) {
+	const wrappedFn = function (...args) {
+		const arg0 = args[0];
+
+		if (arg0 === undefined || arg0 === null) {
+			return arg0;
+		}
+
+		if (arg0.length > 1) {
+			args = arg0;
+		}
+
+		const result = fn(args);
+
+		// We're assuming the result is an array here.
+		// see notice in conversions.js; don't use box types
+		// in conversion functions.
+		if (typeof result === 'object') {
+			for (let len = result.length, i = 0; i < len; i++) {
+				result[i] = Math.round(result[i]);
+			}
+		}
+
+		return result;
+	};
+
+	// Preserve .conversion property if there is one
+	if ('conversion' in fn) {
+		wrappedFn.conversion = fn.conversion;
+	}
+
+	return wrappedFn;
+}
+
+models.forEach(fromModel => {
+	convert[fromModel] = {};
+
+	Object.defineProperty(convert[fromModel], 'channels', {value: conversions[fromModel].channels});
+	Object.defineProperty(convert[fromModel], 'labels', {value: conversions[fromModel].labels});
+
+	const routes = route(fromModel);
+	const routeModels = Object.keys(routes);
+
+	routeModels.forEach(toModel => {
+		const fn = routes[toModel];
+
+		convert[fromModel][toModel] = wrapRounded(fn);
+		convert[fromModel][toModel].raw = wrapRaw(fn);
+	});
+});
+
+module.exports = convert;
+
+
+/***/ }),
+
+/***/ 880:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const conversions = __nccwpck_require__(7391);
+
+/*
+	This function routes a model to all other models.
+
+	all functions that are routed have a property `.conversion` attached
+	to the returned synthetic function. This property is an array
+	of strings, each with the steps in between the 'from' and 'to'
+	color models (inclusive).
+
+	conversions that are not possible simply are not included.
+*/
+
+function buildGraph() {
+	const graph = {};
+	// https://jsperf.com/object-keys-vs-for-in-with-closure/3
+	const models = Object.keys(conversions);
+
+	for (let len = models.length, i = 0; i < len; i++) {
+		graph[models[i]] = {
+			// http://jsperf.com/1-vs-infinity
+			// micro-opt, but this is simple.
+			distance: -1,
+			parent: null
+		};
+	}
+
+	return graph;
+}
+
+// https://en.wikipedia.org/wiki/Breadth-first_search
+function deriveBFS(fromModel) {
+	const graph = buildGraph();
+	const queue = [fromModel]; // Unshift -> queue -> pop
+
+	graph[fromModel].distance = 0;
+
+	while (queue.length) {
+		const current = queue.pop();
+		const adjacents = Object.keys(conversions[current]);
+
+		for (let len = adjacents.length, i = 0; i < len; i++) {
+			const adjacent = adjacents[i];
+			const node = graph[adjacent];
+
+			if (node.distance === -1) {
+				node.distance = graph[current].distance + 1;
+				node.parent = current;
+				queue.unshift(adjacent);
+			}
+		}
+	}
+
+	return graph;
+}
+
+function link(from, to) {
+	return function (args) {
+		return to(from(args));
+	};
+}
+
+function wrapConversion(toModel, graph) {
+	const path = [graph[toModel].parent, toModel];
+	let fn = conversions[graph[toModel].parent][toModel];
+
+	let cur = graph[toModel].parent;
+	while (graph[cur].parent) {
+		path.unshift(graph[cur].parent);
+		fn = link(conversions[graph[cur].parent][cur], fn);
+		cur = graph[cur].parent;
+	}
+
+	fn.conversion = path;
+	return fn;
+}
+
+module.exports = function (fromModel) {
+	const graph = deriveBFS(fromModel);
+	const conversion = {};
+
+	const models = Object.keys(graph);
+	for (let len = models.length, i = 0; i < len; i++) {
+		const toModel = models[i];
+		const node = graph[toModel];
+
+		if (node.parent === null) {
+			// No possible conversion, or this node is the source model.
+			continue;
+		}
+
+		conversion[toModel] = wrapConversion(toModel, graph);
+	}
+
+	return conversion;
+};
+
+
+
+/***/ }),
+
+/***/ 8510:
+/***/ ((module) => {
+
+"use strict";
+
+
+module.exports = {
+	"aliceblue": [240, 248, 255],
+	"antiquewhite": [250, 235, 215],
+	"aqua": [0, 255, 255],
+	"aquamarine": [127, 255, 212],
+	"azure": [240, 255, 255],
+	"beige": [245, 245, 220],
+	"bisque": [255, 228, 196],
+	"black": [0, 0, 0],
+	"blanchedalmond": [255, 235, 205],
+	"blue": [0, 0, 255],
+	"blueviolet": [138, 43, 226],
+	"brown": [165, 42, 42],
+	"burlywood": [222, 184, 135],
+	"cadetblue": [95, 158, 160],
+	"chartreuse": [127, 255, 0],
+	"chocolate": [210, 105, 30],
+	"coral": [255, 127, 80],
+	"cornflowerblue": [100, 149, 237],
+	"cornsilk": [255, 248, 220],
+	"crimson": [220, 20, 60],
+	"cyan": [0, 255, 255],
+	"darkblue": [0, 0, 139],
+	"darkcyan": [0, 139, 139],
+	"darkgoldenrod": [184, 134, 11],
+	"darkgray": [169, 169, 169],
+	"darkgreen": [0, 100, 0],
+	"darkgrey": [169, 169, 169],
+	"darkkhaki": [189, 183, 107],
+	"darkmagenta": [139, 0, 139],
+	"darkolivegreen": [85, 107, 47],
+	"darkorange": [255, 140, 0],
+	"darkorchid": [153, 50, 204],
+	"darkred": [139, 0, 0],
+	"darksalmon": [233, 150, 122],
+	"darkseagreen": [143, 188, 143],
+	"darkslateblue": [72, 61, 139],
+	"darkslategray": [47, 79, 79],
+	"darkslategrey": [47, 79, 79],
+	"darkturquoise": [0, 206, 209],
+	"darkviolet": [148, 0, 211],
+	"deeppink": [255, 20, 147],
+	"deepskyblue": [0, 191, 255],
+	"dimgray": [105, 105, 105],
+	"dimgrey": [105, 105, 105],
+	"dodgerblue": [30, 144, 255],
+	"firebrick": [178, 34, 34],
+	"floralwhite": [255, 250, 240],
+	"forestgreen": [34, 139, 34],
+	"fuchsia": [255, 0, 255],
+	"gainsboro": [220, 220, 220],
+	"ghostwhite": [248, 248, 255],
+	"gold": [255, 215, 0],
+	"goldenrod": [218, 165, 32],
+	"gray": [128, 128, 128],
+	"green": [0, 128, 0],
+	"greenyellow": [173, 255, 47],
+	"grey": [128, 128, 128],
+	"honeydew": [240, 255, 240],
+	"hotpink": [255, 105, 180],
+	"indianred": [205, 92, 92],
+	"indigo": [75, 0, 130],
+	"ivory": [255, 255, 240],
+	"khaki": [240, 230, 140],
+	"lavender": [230, 230, 250],
+	"lavenderblush": [255, 240, 245],
+	"lawngreen": [124, 252, 0],
+	"lemonchiffon": [255, 250, 205],
+	"lightblue": [173, 216, 230],
+	"lightcoral": [240, 128, 128],
+	"lightcyan": [224, 255, 255],
+	"lightgoldenrodyellow": [250, 250, 210],
+	"lightgray": [211, 211, 211],
+	"lightgreen": [144, 238, 144],
+	"lightgrey": [211, 211, 211],
+	"lightpink": [255, 182, 193],
+	"lightsalmon": [255, 160, 122],
+	"lightseagreen": [32, 178, 170],
+	"lightskyblue": [135, 206, 250],
+	"lightslategray": [119, 136, 153],
+	"lightslategrey": [119, 136, 153],
+	"lightsteelblue": [176, 196, 222],
+	"lightyellow": [255, 255, 224],
+	"lime": [0, 255, 0],
+	"limegreen": [50, 205, 50],
+	"linen": [250, 240, 230],
+	"magenta": [255, 0, 255],
+	"maroon": [128, 0, 0],
+	"mediumaquamarine": [102, 205, 170],
+	"mediumblue": [0, 0, 205],
+	"mediumorchid": [186, 85, 211],
+	"mediumpurple": [147, 112, 219],
+	"mediumseagreen": [60, 179, 113],
+	"mediumslateblue": [123, 104, 238],
+	"mediumspringgreen": [0, 250, 154],
+	"mediumturquoise": [72, 209, 204],
+	"mediumvioletred": [199, 21, 133],
+	"midnightblue": [25, 25, 112],
+	"mintcream": [245, 255, 250],
+	"mistyrose": [255, 228, 225],
+	"moccasin": [255, 228, 181],
+	"navajowhite": [255, 222, 173],
+	"navy": [0, 0, 128],
+	"oldlace": [253, 245, 230],
+	"olive": [128, 128, 0],
+	"olivedrab": [107, 142, 35],
+	"orange": [255, 165, 0],
+	"orangered": [255, 69, 0],
+	"orchid": [218, 112, 214],
+	"palegoldenrod": [238, 232, 170],
+	"palegreen": [152, 251, 152],
+	"paleturquoise": [175, 238, 238],
+	"palevioletred": [219, 112, 147],
+	"papayawhip": [255, 239, 213],
+	"peachpuff": [255, 218, 185],
+	"peru": [205, 133, 63],
+	"pink": [255, 192, 203],
+	"plum": [221, 160, 221],
+	"powderblue": [176, 224, 230],
+	"purple": [128, 0, 128],
+	"rebeccapurple": [102, 51, 153],
+	"red": [255, 0, 0],
+	"rosybrown": [188, 143, 143],
+	"royalblue": [65, 105, 225],
+	"saddlebrown": [139, 69, 19],
+	"salmon": [250, 128, 114],
+	"sandybrown": [244, 164, 96],
+	"seagreen": [46, 139, 87],
+	"seashell": [255, 245, 238],
+	"sienna": [160, 82, 45],
+	"silver": [192, 192, 192],
+	"skyblue": [135, 206, 235],
+	"slateblue": [106, 90, 205],
+	"slategray": [112, 128, 144],
+	"slategrey": [112, 128, 144],
+	"snow": [255, 250, 250],
+	"springgreen": [0, 255, 127],
+	"steelblue": [70, 130, 180],
+	"tan": [210, 180, 140],
+	"teal": [0, 128, 128],
+	"thistle": [216, 191, 216],
+	"tomato": [255, 99, 71],
+	"turquoise": [64, 224, 208],
+	"violet": [238, 130, 238],
+	"wheat": [245, 222, 179],
+	"white": [255, 255, 255],
+	"whitesmoke": [245, 245, 245],
+	"yellow": [255, 255, 0],
+	"yellowgreen": [154, 205, 50]
+};
+
+
+/***/ }),
+
 /***/ 1569:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -1448,12 +3244,161 @@ module.exports.sync = function(commandName) {
 
 /***/ }),
 
-/***/ 4833:
+/***/ 1621:
 /***/ ((module) => {
 
 "use strict";
-function _createForOfIteratorHelper(o,allowArrayLike){var it;if(typeof Symbol==="undefined"||o[Symbol.iterator]==null){if(Array.isArray(o)||(it=_unsupportedIterableToArray(o))||allowArrayLike&&o&&typeof o.length==="number"){if(it)o=it;var i=0;var F=function F(){};return{s:F,n:function n(){if(i>=o.length)return{done:true};return{done:false,value:o[i++]}},e:function e(_e2){throw _e2},f:F}}throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}var normalCompletion=true,didErr=false,err;return{s:function s(){it=o[Symbol.iterator]()},n:function n(){var step=it.next();normalCompletion=step.done;return step},e:function e(_e3){didErr=true;err=_e3},f:function f(){try{if(!normalCompletion&&it["return"]!=null)it["return"]()}finally{if(didErr)throw err}}}}function _defineProperty(obj,key,value){if(key in obj){Object.defineProperty(obj,key,{value:value,enumerable:true,configurable:true,writable:true})}else{obj[key]=value}return obj}function _slicedToArray(arr,i){return _arrayWithHoles(arr)||_iterableToArrayLimit(arr,i)||_unsupportedIterableToArray(arr,i)||_nonIterableRest()}function _nonIterableRest(){throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.")}function _unsupportedIterableToArray(o,minLen){if(!o)return;if(typeof o==="string")return _arrayLikeToArray(o,minLen);var n=Object.prototype.toString.call(o).slice(8,-1);if(n==="Object"&&o.constructor)n=o.constructor.name;if(n==="Map"||n==="Set")return Array.from(o);if(n==="Arguments"||/^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n))return _arrayLikeToArray(o,minLen)}function _arrayLikeToArray(arr,len){if(len==null||len>arr.length)len=arr.length;for(var i=0,arr2=new Array(len);i<len;i++){arr2[i]=arr[i]}return arr2}function _iterableToArrayLimit(arr,i){if(typeof Symbol==="undefined"||!(Symbol.iterator in Object(arr)))return;var _arr=[];var _n=true;var _d=false;var _e=undefined;try{for(var _i=arr[Symbol.iterator](),_s;!(_n=(_s=_i.next()).done);_n=true){_arr.push(_s.value);if(i&&_arr.length===i)break}}catch(err){_d=true;_e=err}finally{try{if(!_n&&_i["return"]!=null)_i["return"]()}finally{if(_d)throw _e}}return _arr}function _arrayWithHoles(arr){if(Array.isArray(arr))return arr}module.exports=function(input){if(!input)return[];if(typeof input!=="string"||input.match(/^\s+$/))return[];var lines=input.split("\n");if(lines.length===0)return[];var files=[];var currentFile=null;var currentChunk=null;var deletedLineCounter=0;var addedLineCounter=0;var normal=function normal(line){var _currentChunk;(_currentChunk=currentChunk)===null||_currentChunk===void 0?void 0:_currentChunk.changes.push({type:"normal",normal:true,ln1:deletedLineCounter++,ln2:addedLineCounter++,content:line})};var start=function start(line){var _parseFiles;var _ref=(_parseFiles=parseFiles(line))!==null&&_parseFiles!==void 0?_parseFiles:[],_ref2=_slicedToArray(_ref,2),fromFileName=_ref2[0],toFileName=_ref2[1];currentFile={chunks:[],deletions:0,additions:0,from:fromFileName,to:toFileName};files.push(currentFile)};var restart=function restart(){if(!currentFile||currentFile.chunks.length)start()};var newFile=function newFile(){restart();currentFile["new"]=true;currentFile.from="/dev/null"};var deletedFile=function deletedFile(){restart();currentFile.deleted=true;currentFile.to="/dev/null"};var index=function index(line){restart();currentFile.index=line.split(" ").slice(1)};var fromFile=function fromFile(line){restart();currentFile.from=parseOldOrNewFile(line)};var toFile=function toFile(line){restart();currentFile.to=parseOldOrNewFile(line)};var chunk=function chunk(line,match){if(!currentFile)return;var _match$slice=match.slice(1),_match$slice2=_slicedToArray(_match$slice,4),oldStart=_match$slice2[0],oldNumLines=_match$slice2[1],newStart=_match$slice2[2],newNumLines=_match$slice2[3];deletedLineCounter=+oldStart;addedLineCounter=+newStart;currentChunk={content:line,changes:[],oldStart:+oldStart,oldLines:+(oldNumLines||1),newStart:+newStart,newLines:+(newNumLines||1)};currentFile.chunks.push(currentChunk)};var del=function del(line){if(!currentChunk)return;currentChunk.changes.push({type:"del",del:true,ln:deletedLineCounter++,content:line});currentFile.deletions++};var add=function add(line){if(!currentChunk)return;currentChunk.changes.push({type:"add",add:true,ln:addedLineCounter++,content:line});currentFile.additions++};var eof=function eof(line){var _currentChunk$changes3;if(!currentChunk)return;var _currentChunk$changes=currentChunk.changes.slice(-1),_currentChunk$changes2=_slicedToArray(_currentChunk$changes,1),mostRecentChange=_currentChunk$changes2[0];currentChunk.changes.push((_currentChunk$changes3={type:mostRecentChange.type},_defineProperty(_currentChunk$changes3,mostRecentChange.type,true),_defineProperty(_currentChunk$changes3,"ln1",mostRecentChange.ln1),_defineProperty(_currentChunk$changes3,"ln2",mostRecentChange.ln2),_defineProperty(_currentChunk$changes3,"ln",mostRecentChange.ln),_defineProperty(_currentChunk$changes3,"content",line),_currentChunk$changes3))};var schema=[// TODO: better regexp to avoid detect normal line starting with diff
-[/^\s+/,normal],[/^diff\s/,start],[/^new file mode \d+$/,newFile],[/^deleted file mode \d+$/,deletedFile],[/^index\s[\da-zA-Z]+\.\.[\da-zA-Z]+(\s(\d+))?$/,index],[/^---\s/,fromFile],[/^\+\+\+\s/,toFile],[/^@@\s+-(\d+),?(\d+)?\s+\+(\d+),?(\d+)?\s@@/,chunk],[/^-/,del],[/^\+/,add],[/^\\ No newline at end of file$/,eof]];var parseLine=function parseLine(line){var _iterator=_createForOfIteratorHelper(schema),_step;try{for(_iterator.s();!(_step=_iterator.n()).done;){var _step$value=_slicedToArray(_step.value,2),pattern=_step$value[0],handler=_step$value[1];var match=line.match(pattern);if(match){handler(line,match);return true}}}catch(err){_iterator.e(err)}finally{_iterator.f()}return false};var _iterator2=_createForOfIteratorHelper(lines),_step2;try{for(_iterator2.s();!(_step2=_iterator2.n()).done;){var line=_step2.value;parseLine(line)}}catch(err){_iterator2.e(err)}finally{_iterator2.f()}return files};var fileNameDiffRegex=/a\/.*(?=["']? ["']?b\/)|b\/.*$/g;var gitFileHeaderRegex=/^(a|b)\//;var parseFiles=function parseFiles(line){var fileNames=line===null||line===void 0?void 0:line.match(fileNameDiffRegex);return fileNames===null||fileNames===void 0?void 0:fileNames.map(function(fileName){return fileName.replace(gitFileHeaderRegex,"").replace(/("|')$/,"")})};var qoutedFileNameRegex=/^\\?['"]|\\?['"]$/g;var parseOldOrNewFile=function parseOldOrNewFile(line){var fileName=leftTrimChars(line,"-+").trim();fileName=removeTimeStamp(fileName);return fileName.replace(qoutedFileNameRegex,"").replace(gitFileHeaderRegex,"")};var leftTrimChars=function leftTrimChars(string,trimmingChars){string=makeString(string);if(!trimmingChars&&String.prototype.trimLeft)return string.trimLeft();var trimmingString=formTrimmingString(trimmingChars);return string.replace(new RegExp("^".concat(trimmingString,"+")),"")};var timeStampRegex=/\t.*|\d{4}-\d\d-\d\d\s\d\d:\d\d:\d\d(.\d+)?\s(\+|-)\d\d\d\d/;var removeTimeStamp=function removeTimeStamp(string){var timeStamp=timeStampRegex.exec(string);if(timeStamp){string=string.substring(0,timeStamp.index).trim()}return string};var formTrimmingString=function formTrimmingString(trimmingChars){if(trimmingChars===null||trimmingChars===undefined)return"\\s";else if(trimmingChars instanceof RegExp)return trimmingChars.source;return"[".concat(makeString(trimmingChars).replace(/([.*+?^=!:${}()|[\]/\\])/g,"\\$1"),"]")};var makeString=function makeString(itemToConvert){return(itemToConvert!==null&&itemToConvert!==void 0?itemToConvert:"")+""};
+
+
+module.exports = (flag, argv = process.argv) => {
+	const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
+	const position = argv.indexOf(prefix + flag);
+	const terminatorPosition = argv.indexOf('--');
+	return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+};
+
+
+/***/ }),
+
+/***/ 9318:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+"use strict";
+
+const os = __nccwpck_require__(2037);
+const tty = __nccwpck_require__(6224);
+const hasFlag = __nccwpck_require__(1621);
+
+const {env} = process;
+
+let forceColor;
+if (hasFlag('no-color') ||
+	hasFlag('no-colors') ||
+	hasFlag('color=false') ||
+	hasFlag('color=never')) {
+	forceColor = 0;
+} else if (hasFlag('color') ||
+	hasFlag('colors') ||
+	hasFlag('color=true') ||
+	hasFlag('color=always')) {
+	forceColor = 1;
+}
+
+if ('FORCE_COLOR' in env) {
+	if (env.FORCE_COLOR === 'true') {
+		forceColor = 1;
+	} else if (env.FORCE_COLOR === 'false') {
+		forceColor = 0;
+	} else {
+		forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+	}
+}
+
+function translateLevel(level) {
+	if (level === 0) {
+		return false;
+	}
+
+	return {
+		level,
+		hasBasic: true,
+		has256: level >= 2,
+		has16m: level >= 3
+	};
+}
+
+function supportsColor(haveStream, streamIsTTY) {
+	if (forceColor === 0) {
+		return 0;
+	}
+
+	if (hasFlag('color=16m') ||
+		hasFlag('color=full') ||
+		hasFlag('color=truecolor')) {
+		return 3;
+	}
+
+	if (hasFlag('color=256')) {
+		return 2;
+	}
+
+	if (haveStream && !streamIsTTY && forceColor === undefined) {
+		return 0;
+	}
+
+	const min = forceColor || 0;
+
+	if (env.TERM === 'dumb') {
+		return min;
+	}
+
+	if (process.platform === 'win32') {
+		// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+		// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
+		const osRelease = os.release().split('.');
+		if (
+			Number(osRelease[0]) >= 10 &&
+			Number(osRelease[2]) >= 10586
+		) {
+			return Number(osRelease[2]) >= 14931 ? 3 : 2;
+		}
+
+		return 1;
+	}
+
+	if ('CI' in env) {
+		if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			return 1;
+		}
+
+		return min;
+	}
+
+	if ('TEAMCITY_VERSION' in env) {
+		return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+	}
+
+	if (env.COLORTERM === 'truecolor') {
+		return 3;
+	}
+
+	if ('TERM_PROGRAM' in env) {
+		const version = parseInt((env.TERM_PROGRAM_VERSION || '').split('.')[0], 10);
+
+		switch (env.TERM_PROGRAM) {
+			case 'iTerm.app':
+				return version >= 3 ? 3 : 2;
+			case 'Apple_Terminal':
+				return 2;
+			// No default
+		}
+	}
+
+	if (/-256(color)?$/i.test(env.TERM)) {
+		return 2;
+	}
+
+	if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+		return 1;
+	}
+
+	if ('COLORTERM' in env) {
+		return 1;
+	}
+
+	return min;
+}
+
+function getSupportLevel(stream) {
+	const level = supportsColor(stream, stream && stream.isTTY);
+	return translateLevel(level);
+}
+
+module.exports = {
+	supportsColor: getSupportLevel,
+	stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+	stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+};
 
 
 /***/ }),
@@ -1757,14 +3702,14 @@ function checkOutRemoteBranch(context) {
 		core.info(`Adding "${context.repository.forkName}" fork as remote with Git`);
 		const cloneURl = new URL(context.repository.forkCloneUrl);
 		cloneURl.username = context.actor;
-		cloneURl.username = context.token;
+		cloneURl.password = context.token;
 		run(`git remote add fork ${cloneURl.toString()}`);
 	} else {
 		// No fork: Update remote URL to include auth information (so auto-fixes can be pushed)
 		core.info(`Adding auth information to Git remote URL`);
 		const cloneURl = new URL(context.repository.cloneUrl);
 		cloneURl.username = context.actor;
-		cloneURl.username = context.token;
+		cloneURl.password = context.token;
 		run(`git remote set-url origin ${cloneURl.toString()}`);
 	}
 
@@ -2083,56 +4028,57 @@ module.exports = {
 
 /***/ }),
 
-/***/ 9844:
+/***/ 2913:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { run } = __nccwpck_require__(9575);
 const commandExists = __nccwpck_require__(5265);
-const { parseErrorsFromDiff } = __nccwpck_require__(4388);
 const { initLintResult } = __nccwpck_require__(9149);
+const { getNpmBinCommand } = __nccwpck_require__(1838);
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
 
 /**
- * https://black.readthedocs.io
+ * It helps to enforce coding style guidelines for files (JavaScript, YAML) by formatting
+ * source code in a consistent way.
  */
-class Black {
+class WPScriptsFormat {
 	static get name() {
-		return "Black";
+		return "WP-Scripts Format";
 	}
 
 	/**
 	 * Verifies that all required programs are installed. Throws an error if programs are missing
 	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
+	 * @param {string} prefix - Prefix to the format command
 	 */
 	static async verifySetup(dir, prefix = "") {
-		// Verify that Python is installed (required to execute Black)
-		if (!(await commandExists("python"))) {
-			throw new Error("Python is not installed");
+		// Verify that NPM is installed (required to execute ESLint)
+		if (!(await commandExists("npm"))) {
+			throw new Error("NPM is not installed");
 		}
 
-		// Verify that Black is installed
+		// Verify that WPScripts is installed
+		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${prefix} black --version`, { dir });
+			// Format doesn't have any flags, run lint-js instead
+			run(`${commandPrefix} wp-scripts lint-js -v`, { dir });
 		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
+			throw new Error(err.message);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
+	 * @param {boolean} fix - Dummy variable for compatibility
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files = `^.*\\.(${extensions.join("|")})$`;
-		const fixArg = fix ? "" : "--check --diff";
-		return run(`${prefix} black ${fixArg} --include "${files}" ${args} "."`, {
+	static lint(dir, args = "", fix = false, prefix = "") {
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		return run(`${commandPrefix} wp-scripts format ${args}`, {
 			dir,
 			ignoreErrors: true,
 		});
@@ -2147,18 +4093,40 @@ class Black {
 	 */
 	static parseOutput(dir, output) {
 		const lintResult = initLintResult();
-		lintResult.error = parseErrorsFromDiff(output.stdout);
 		lintResult.isSuccess = output.status === 0;
-		return lintResult;
+
+		return false;
 	}
 }
 
-module.exports = Black;
+module.exports = WPScriptsFormat;
 
 
 /***/ }),
 
-/***/ 7169:
+/***/ 8565:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const Format = __nccwpck_require__(2913);
+const LintJs = __nccwpck_require__(7638);
+const LintMdJs = __nccwpck_require__(9011);
+const LintStyle = __nccwpck_require__(7430);
+
+const linters = {
+	// Format
+	format: Format,
+	// Linters
+	lint_js: LintJs,
+	lint_md_js: LintMdJs,
+	lint_style: LintStyle,
+};
+
+module.exports = linters;
+
+
+/***/ }),
+
+/***/ 7638:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { run } = __nccwpck_require__(9575);
@@ -2172,9 +4140,9 @@ const { removeTrailingPeriod } = __nccwpck_require__(9321);
 /**
  * https://eslint.org
  */
-class ESLint {
+class WPScriptsLintJS {
 	static get name() {
-		return "ESLint";
+		return "WP-Scripts Lint JS";
 	}
 
 	/**
@@ -2188,35 +4156,29 @@ class ESLint {
 			throw new Error("NPM is not installed");
 		}
 
-		// Verify that ESLint is installed
+		// Verify that WPScripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} eslint -v`, { dir });
+			run(`${commandPrefix} wp-scripts lint-js -v`, { dir });
 		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
+			throw new Error(err.message);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.map((ext) => `.${ext}`).join(",");
-		const fixArg = fix ? "--fix" : "";
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(
-			`${commandPrefix} eslint --ext ${extensionsArg} ${fixArg} --no-color --format json ${args} "."`,
-			{
-				dir,
-				ignoreErrors: true,
-			},
-		);
+		return run(`${commandPrefix} wp-scripts lint-js --format json --no-color ${args}`, {
+			dir,
+			ignoreErrors: true,
+		});
 	}
 
 	/**
@@ -2248,7 +4210,7 @@ class ESLint {
 
 				// Exit if a fatal ESLint error occurred
 				if (fatal) {
-					throw Error(`ESLint error: ${message}`);
+					throw Error(`${this.name} Lint error: ${message}`);
 				}
 
 				const entry = {
@@ -2269,554 +4231,28 @@ class ESLint {
 	}
 }
 
-module.exports = ESLint;
+module.exports = WPScriptsLintJS;
 
 
 /***/ }),
 
-/***/ 3636:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { sep } = __nccwpck_require__(1017);
-
-const core = __nccwpck_require__(2186);
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-const { capitalizeFirstLetter } = __nccwpck_require__(9321);
-
-const PARSE_REGEX = /^(.*):([0-9]+):[0-9]+: (\w*) (.*)$/gm;
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * http://flake8.pycqa.org
- */
-class Flake8 {
-	static get name() {
-		return "Flake8";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that Python is installed (required to execute Flake8)
-		if (!(await commandExists("python"))) {
-			throw new Error("Python is not installed");
-		}
-
-		// Verify that Flake8 is installed
-		try {
-			run(`${prefix} flake8 --version`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (fix) {
-			core.warning(`${this.name} does not support auto-fixing`);
-		}
-
-		const files = extensions.map((ext) => `"**${sep}*.${ext}"`).join(",");
-		return run(`${prefix} flake8 --filename ${files} ${args}`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		const matches = output.stdout.matchAll(PARSE_REGEX);
-		for (const match of matches) {
-			const [_, pathFull, line, rule, text] = match;
-			const leadingSep = `.${sep}`;
-			let path = pathFull;
-			if (path.startsWith(leadingSep)) {
-				path = path.substring(2); // Remove "./" or ".\" from start of path
-			}
-			const lineNr = parseInt(line, 10);
-			lintResult.error.push({
-				path,
-				firstLine: lineNr,
-				lastLine: lineNr,
-				message: `${capitalizeFirstLetter(text)} (${rule})`,
-			});
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = Flake8;
-
-
-/***/ }),
-
-/***/ 7796:
+/***/ 9011:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { run } = __nccwpck_require__(9575);
 const commandExists = __nccwpck_require__(5265);
-const { parseErrorsFromDiff } = __nccwpck_require__(4388);
 const { initLintResult } = __nccwpck_require__(9149);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://golang.org/cmd/gofmt
- */
-class Gofmt {
-	static get name() {
-		return "gofmt";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that gofmt is installed
-		if (!(await commandExists("gofmt"))) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "go") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-
-		// -d: Display diffs instead of rewriting files
-		// -e: Report all errors (not just the first 10 on different lines)
-		// -s: Simplify code
-		// -w: Write result to (source) file instead of stdout
-		const fixArg = fix ? "-w" : "-d -e";
-		return run(`${prefix} gofmt -s ${fixArg} ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-
-		// The gofmt output lines starting with "diff" differ from the ones of tools like Git:
-		//
-		//   - gofmt: "diff -u file-old.txt file-new.txt"
-		//   - Git: "diff --git a/file-old.txt b/file-new.txt"
-		//
-		// The diff parser relies on the "a/" and "b/" strings to be able to tell where file names
-		// start. Without these strings, this would not be possible, because file names may include
-		// spaces, which are not escaped in unified diffs. As a workaround, these lines are filtered out
-		// from the gofmt diff so the diff parser can read the diff without errors
-		const filteredOutput = output.stdout
-			.split(/\r?\n/)
-			.filter((line) => !line.startsWith("diff -u"))
-			.join("\n");
-		lintResult.error = parseErrorsFromDiff(filteredOutput);
-
-		// gofmt exits with 0 even if there are formatting issues. Therefore, this function determines
-		// the success of the linting process based on the number of parsed errors
-		lintResult.isSuccess = lintResult.error.length === 0;
-
-		return lintResult;
-	}
-}
-
-module.exports = Gofmt;
-
-
-/***/ }),
-
-/***/ 5658:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(2186);
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-const { capitalizeFirstLetter } = __nccwpck_require__(9321);
-
-const PARSE_REGEX = /^(.+):([0-9]+):[0-9]+: (.+)$/gm;
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://github.com/golang/lint
- */
-class Golint {
-	static get name() {
-		return "golint";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that golint is installed
-		if (!(await commandExists("golint"))) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "go") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-		if (fix) {
-			core.warning(`${this.name} does not support auto-fixing`);
-		}
-
-		return run(`${prefix} golint -set_exit_status ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		const matches = output.stdout.matchAll(PARSE_REGEX);
-		for (const match of matches) {
-			const [_, path, line, text] = match;
-			const lineNr = parseInt(line, 10);
-			lintResult.error.push({
-				path,
-				firstLine: lineNr,
-				lastLine: lineNr,
-				message: capitalizeFirstLetter(text),
-			});
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = Golint;
-
-
-/***/ }),
-
-/***/ 8565:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const Black = __nccwpck_require__(9844);
-const ESLint = __nccwpck_require__(7169);
-const Flake8 = __nccwpck_require__(3636);
-const Gofmt = __nccwpck_require__(7796);
-const Golint = __nccwpck_require__(5658);
-const Mypy = __nccwpck_require__(8510);
-const Oitnb = __nccwpck_require__(1187);
-const PHPCodeSniffer = __nccwpck_require__(5405);
-const Prettier = __nccwpck_require__(3460);
-const RuboCop = __nccwpck_require__(1399);
-const Stylelint = __nccwpck_require__(194);
-const SwiftFormatLockwood = __nccwpck_require__(8983);
-const SwiftFormatOfficial = __nccwpck_require__(1828);
-const SwiftLint = __nccwpck_require__(1439);
-const XO = __nccwpck_require__(728);
-
-const linters = {
-	// Linters
-	eslint: ESLint,
-	flake8: Flake8,
-	golint: Golint,
-	mypy: Mypy,
-	php_codesniffer: PHPCodeSniffer,
-	rubocop: RuboCop,
-	stylelint: Stylelint,
-	swiftlint: SwiftLint,
-	xo: XO,
-
-	// Formatters (should be run after linters)
-	black: Black,
-	gofmt: Gofmt,
-	oitnb: Oitnb,
-	prettier: Prettier,
-	swift_format_lockwood: SwiftFormatLockwood,
-	swift_format_official: SwiftFormatOfficial,
-
-	// Alias of `swift_format_lockwood` (for backward compatibility)
-	// TODO: Remove alias in v2
-	swiftformat: SwiftFormatLockwood,
-};
-
-module.exports = linters;
-
-
-/***/ }),
-
-/***/ 8510:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const fs = __nccwpck_require__(7147);
-const { sep } = __nccwpck_require__(1017);
-
-const core = __nccwpck_require__(2186);
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-
-const PARSE_REGEX = /^(.*):([0-9]+): (\w*): (.*)$/gm;
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://mypy.readthedocs.io/en/stable/
- */
-class Mypy {
-	static get name() {
-		return "Mypy";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that Python is installed (required to execute Mypy)
-		if (!(await commandExists("python"))) {
-			throw new Error("Python is not installed");
-		}
-
-		// Verify that Mypy is installed
-		if (!(await commandExists("mypy"))) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "py") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-		if (fix) {
-			core.warning(`${this.name} does not support auto-fixing`);
-		}
-
-		let specifiedPath = false;
-		// Check if they passed a directory as an arg
-		for (const arg of args.split(" ")) {
-			if (fs.existsSync(arg)) {
-				specifiedPath = true;
-				break;
-			}
-		}
-		let extraArgs = "";
-		if (!specifiedPath) {
-			extraArgs = ` ${dir}`;
-		}
-		return run(`${prefix} mypy ${args}${extraArgs}`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		const matches = output.stdout.matchAll(PARSE_REGEX);
-		for (const match of matches) {
-			const [_, pathFull, line, level, text] = match;
-			const leadingSep = `.${sep}`;
-			let path = pathFull;
-			if (path.startsWith(leadingSep)) {
-				path = path.substring(2); // Remove "./" or ".\" from start of path
-			}
-			const lineNr = parseInt(line, 10);
-			const result = {
-				path,
-				firstLine: lineNr,
-				lastLine: lineNr,
-				message: text,
-			};
-			if (level === "error") {
-				lintResult.error.push(result);
-			} else if (level === "warning") {
-				lintResult.warning.push(result);
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = Mypy;
-
-
-/***/ }),
-
-/***/ 1187:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { parseErrorsFromDiff } = __nccwpck_require__(4388);
-const { initLintResult } = __nccwpck_require__(9149);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://pypi.org/project/oitnb/
- */
-class Oitnb {
-	static get name() {
-		return "oitnb";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that Python is installed (required to execute oitnb)
-		if (!(await commandExists("python"))) {
-			throw new Error("Python is not installed");
-		}
-
-		// Verify that oitnb is installed
-		try {
-			run(`${prefix} oitnb --version`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files = `^.*\\.(${extensions.join("|")})$`;
-		const fixArg = fix ? "" : "--check --diff";
-		return run(`${prefix} oitnb ${fixArg} --include "${files}" ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.error = parseErrorsFromDiff(output.stdout);
-		lintResult.isSuccess = output.status === 0;
-		return lintResult;
-	}
-}
-
-module.exports = Oitnb;
-
-
-/***/ }),
-
-/***/ 5405:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const core = __nccwpck_require__(2186);
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
+const { getNpmBinCommand } = __nccwpck_require__(1838);
 const { removeTrailingPeriod } = __nccwpck_require__(9321);
 
 /** @typedef {import('../utils/lint-result').LintResult} LintResult */
 
 /**
- * https://github.com/squizlabs/PHP_CodeSniffer
+ * https://eslint.org
  */
-class PHPCodeSniffer {
+class WPScriptsLintMDJS {
 	static get name() {
-		return "PHP_CodeSniffer";
+		return "WP-Scripts Lint MD JS";
 	}
 
 	/**
@@ -2825,35 +4261,31 @@ class PHPCodeSniffer {
 	 * @param {string} prefix - Prefix to the lint command
 	 */
 	static async verifySetup(dir, prefix = "") {
-		// Verify that PHP is installed (required to execute phpcs)
-		if (!(await commandExists("php"))) {
-			throw new Error("PHP is not installed");
+		// Verify that NPM is installed (required to execute ESLint)
+		if (!(await commandExists("npm"))) {
+			throw new Error("NPM is not installed");
 		}
 
-		// Verify that phpcs is installed
+		// Verify that WPScripts is installed
+		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${prefix} phpcs --version`, { dir });
+			run(`${commandPrefix} wp-scripts lint-md-js -v`, { dir });
 		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
+			throw new Error(err.message);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionsArg = extensions.join(",");
-		if (fix) {
-			core.warning(`${this.name} does not support auto-fixing`);
-		}
-
-		return run(`${prefix} phpcs --extensions=${extensionsArg} --report=json -q ${args} "."`, {
+	static lint(dir, args = "", fix = false, prefix = "") {
+		const commandPrefix = prefix || getNpmBinCommand(dir);
+		return run(`${commandPrefix} wp-scripts lint-md-js --no-color --format json ${args}`, {
 			dir,
 			ignoreErrors: true,
 		});
@@ -2879,21 +4311,27 @@ class PHPCodeSniffer {
 			);
 		}
 
-		for (const [file, violations] of Object.entries(outputJson.files)) {
-			const path = file.indexOf(dir) === 0 ? file.substring(dir.length + 1) : file;
+		for (const violation of outputJson) {
+			const { filePath, messages } = violation;
+			const path = filePath.substring(dir.length + 1);
 
-			for (const msg of violations.messages) {
-				const { line, message, source, type } = msg;
+			for (const msg of messages) {
+				const { fatal, line, message, ruleId, severity } = msg;
+
+				// Exit if a fatal ESLint error occurred
+				if (fatal) {
+					throw Error(`${this.name} Lint error: ${message}`);
+				}
 
 				const entry = {
 					path,
 					firstLine: line,
 					lastLine: line,
-					message: `${removeTrailingPeriod(message)} (${source})`,
+					message: `${removeTrailingPeriod(message)} (${ruleId})`,
 				};
-				if (type === "WARNING") {
+				if (severity === 1) {
 					lintResult.warning.push(entry);
-				} else if (type === "ERROR") {
+				} else if (severity === 2) {
 					lintResult.error.push(entry);
 				}
 			}
@@ -2903,213 +4341,12 @@ class PHPCodeSniffer {
 	}
 }
 
-module.exports = PHPCodeSniffer;
+module.exports = WPScriptsLintMDJS;
 
 
 /***/ }),
 
-/***/ 3460:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-const { getNpmBinCommand } = __nccwpck_require__(1838);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://prettier.io
- */
-class Prettier {
-	static get name() {
-		return "Prettier";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute Prettier)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that Prettier is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} prettier -v`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
-		const fixArg = fix ? "--write" : "--list-different";
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} prettier ${fixArg} --no-color ${args} "${files}"`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-		if (lintResult.isSuccess || !output) {
-			return lintResult;
-		}
-
-		const paths = output.stdout.split(/\r?\n/);
-		lintResult.error = paths.map((path) => ({
-			path,
-			firstLine: 1,
-			lastLine: 1,
-			message:
-				"There are issues with this file's formatting, please run Prettier to fix the errors",
-		}));
-
-		return lintResult;
-	}
-}
-
-module.exports = Prettier;
-
-
-/***/ }),
-
-/***/ 1399:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-const { removeTrailingPeriod } = __nccwpck_require__(9321);
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-// Mapping of RuboCop severities to severities used for GitHub commit annotations
-const severityMap = {
-	convention: "warning",
-	refactor: "warning",
-	warning: "warning",
-	error: "error",
-	fatal: "error",
-};
-
-/**
- * https://rubocop.readthedocs.io
- */
-class RuboCop {
-	static get name() {
-		return "RuboCop";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that Ruby is installed (required to execute RuboCop)
-		if (!(await commandExists("ruby"))) {
-			throw new Error("Ruby is not installed");
-		}
-		// Verify that RuboCop is installed
-		try {
-			run(`${prefix} rubocop -v`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "rb") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-
-		const fixArg = fix ? "--auto-correct" : "";
-		return run(`${prefix} rubocop --format json ${fixArg} ${args}`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		let outputJson;
-		try {
-			outputJson = JSON.parse(output.stdout);
-		} catch (err) {
-			throw Error(
-				`Error parsing ${this.name} JSON output: ${err.message}. Output: "${output.stdout}"`,
-			);
-		}
-
-		for (const file of outputJson.files) {
-			const { path, offenses } = file;
-			for (const offense of offenses) {
-				const { severity, message, cop_name: rule, corrected, location } = offense;
-				if (!corrected) {
-					const mappedSeverity = severityMap[severity] || "error";
-					lintResult[mappedSeverity].push({
-						path,
-						firstLine: location.start_line,
-						lastLine: location.last_line,
-						message: `${removeTrailingPeriod(message)} (${rule})`,
-					});
-				}
-			}
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = RuboCop;
-
-
-/***/ }),
-
-/***/ 194:
+/***/ 7430:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { run } = __nccwpck_require__(9575);
@@ -3122,9 +4359,9 @@ const { getNpmBinCommand } = __nccwpck_require__(1838);
 /**
  * https://stylelint.io
  */
-class Stylelint {
+class WPScriptsLintStyle {
 	static get name() {
-		return "stylelint";
+		return "WP-Scripts Lint Style";
 	}
 
 	/**
@@ -3138,31 +4375,28 @@ class Stylelint {
 			throw new Error("NPM is not installed");
 		}
 
-		// Verify that stylelint is installed
+		// Verify that wp-scripts is installed
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		try {
-			run(`${commandPrefix} stylelint -v`, { dir });
+			run(`${commandPrefix} wp-scripts lint-style -v`, { dir });
 		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
+			throw new Error(err.message);
 		}
 	}
 
 	/**
-	 * Runs the linting program and returns the command output
+	 * Runs the lint-style command and returns the command output
 	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
 	 * @param {string} args - Additional arguments to pass to the linter
 	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
 	 * @param {string} prefix - Prefix to the lint command
 	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
 	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const files =
-			extensions.length === 1 ? `**/*.${extensions[0]}` : `**/*.{${extensions.join(",")}}`;
+	static lint(dir, args = "", fix = false, prefix = "") {
 		const fixArg = fix ? "--fix" : "";
 		const commandPrefix = prefix || getNpmBinCommand(dir);
 		return run(
-			`${commandPrefix} stylelint --no-color --formatter json ${fixArg} ${args} "${files}"`,
+			`${commandPrefix} wp-scripts lint-style --no-color --formatter json ${fixArg} ${args}`,
 			{
 				dir,
 				ignoreErrors: true,
@@ -3210,332 +4444,7 @@ class Stylelint {
 	}
 }
 
-module.exports = Stylelint;
-
-
-/***/ }),
-
-/***/ 8983:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-
-const PARSE_REGEX = /^(.*):([0-9]+):[0-9]+: \w+: \((\w+)\) (.*)\.$/gm;
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://github.com/nicklockwood/SwiftFormat
- */
-class SwiftFormatLockwood {
-	static get name() {
-		return "SwiftFormat";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that SwiftFormat is installed
-		if (!(await commandExists("swiftformat"))) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "swift") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-
-		const fixArg = fix ? "" : "--lint";
-		return run(`${prefix} swiftformat ${fixArg} ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		const matches = output.stderr.matchAll(PARSE_REGEX);
-		for (const match of matches) {
-			const [_, pathFull, line, rule, message] = match;
-			const path = pathFull.substring(dir.length + 1);
-			const lineNr = parseInt(line, 10);
-			// SwiftFormat only seems to use the "warning" level, which this action will therefore
-			// categorize as errors
-			lintResult.error.push({
-				path,
-				firstLine: lineNr,
-				lastLine: lineNr,
-				message: `${message} (${rule})`,
-			});
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = SwiftFormatLockwood;
-
-
-/***/ }),
-
-/***/ 1828:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-
-const PARSE_REGEX = /^(.*):([0-9]+):([0-9]+): (warning|error): (.*)$/gm;
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://github.com/apple/swift-format
- */
-class SwiftFormatOfficial {
-	static get name() {
-		return "swift-format";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that swift-format is installed.
-		if (!(await commandExists("swift-format"))) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "swift") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-
-		const mode = fix ? "format -i" : "lint";
-		return run(`${prefix} swift-format ${mode} ${args} --recursive "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-
-		const matches = output.stderr.matchAll(PARSE_REGEX);
-		for (const match of matches) {
-			const [_line, pathFull, line, _column, _level, message] = match;
-			const path = pathFull.substring(dir.length + 1);
-			const lineNr = parseInt(line, 10);
-			// swift-format only seems to use the "warning" level, which this action will therefore
-			// categorize as errors
-			lintResult.error.push({
-				path,
-				firstLine: lineNr,
-				lastLine: lineNr,
-				message: `${message}`,
-			});
-		}
-
-		// Since 0.50300.0 swift-format exits with 0 even if there are formatting issues. Therefore,
-		// this function determines the success of the linting process based on the number of parsed
-		// errors.
-		lintResult.isSuccess = lintResult.error.length === 0;
-
-		return lintResult;
-	}
-}
-
-module.exports = SwiftFormatOfficial;
-
-
-/***/ }),
-
-/***/ 1439:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { initLintResult } = __nccwpck_require__(9149);
-
-const PARSE_REGEX = /^(.*):([0-9]+):[0-9]+: (warning|error): (.*)$/gm;
-
-/** @typedef {import('../utils/lint-result').LintResult} LintResult */
-
-/**
- * https://github.com/realm/SwiftLint
- */
-class SwiftLint {
-	static get name() {
-		return "SwiftLint";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that SwiftLint is installed
-		if (!(await commandExists("swiftlint"))) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		if (extensions.length !== 1 || extensions[0] !== "swift") {
-			throw new Error(`${this.name} error: File extensions are not configurable`);
-		}
-
-		const fixArg = fix ? "autocorrect" : "lint";
-		return run(`${prefix} swiftlint ${fixArg} ${args}`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-
-	/**
-	 * Parses the output of the lint command. Determines the success of the lint process and the
-	 * severity of the identified code style violations
-	 * @param {string} dir - Directory in which the linter has been run
-	 * @param {{status: number, stdout: string, stderr: string}} output - Output of the lint command
-	 * @returns {LintResult} - Parsed lint result
-	 */
-	static parseOutput(dir, output) {
-		const lintResult = initLintResult();
-		lintResult.isSuccess = output.status === 0;
-
-		const matches = output.stdout.matchAll(PARSE_REGEX);
-		for (const match of matches) {
-			const [_, pathFull, line, level, message] = match;
-			const path = pathFull.substring(dir.length + 1);
-			const lineNr = parseInt(line, 10);
-			lintResult[level].push({
-				path,
-				firstLine: lineNr,
-				lastLine: lineNr,
-				message,
-			});
-		}
-
-		return lintResult;
-	}
-}
-
-module.exports = SwiftLint;
-
-
-/***/ }),
-
-/***/ 728:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const { run } = __nccwpck_require__(9575);
-const commandExists = __nccwpck_require__(5265);
-const { getNpmBinCommand } = __nccwpck_require__(1838);
-const ESLint = __nccwpck_require__(7169);
-
-/**
- * https://github.com/xojs/xo
- * XO is a wrapper for ESLint, so it can use the same logic for parsing lint results
- */
-class XO extends ESLint {
-	static get name() {
-		return "XO";
-	}
-
-	/**
-	 * Verifies that all required programs are installed. Throws an error if programs are missing
-	 * @param {string} dir - Directory to run the linting program in
-	 * @param {string} prefix - Prefix to the lint command
-	 */
-	static async verifySetup(dir, prefix = "") {
-		// Verify that NPM is installed (required to execute XO)
-		if (!(await commandExists("npm"))) {
-			throw new Error("NPM is not installed");
-		}
-
-		// Verify that XO is installed
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		try {
-			run(`${commandPrefix} xo --version`, { dir });
-		} catch (err) {
-			throw new Error(`${this.name} is not installed`);
-		}
-	}
-
-	/**
-	 * Runs the linting program and returns the command output
-	 * @param {string} dir - Directory to run the linter in
-	 * @param {string[]} extensions - File extensions which should be linted
-	 * @param {string} args - Additional arguments to pass to the linter
-	 * @param {boolean} fix - Whether the linter should attempt to fix code style issues automatically
-	 * @param {string} prefix - Prefix to the lint command
-	 * @returns {{status: number, stdout: string, stderr: string}} - Output of the lint command
-	 */
-	static lint(dir, extensions, args = "", fix = false, prefix = "") {
-		const extensionArgs = extensions.map((ext) => `--extension ${ext}`).join(" ");
-		const fixArg = fix ? "--fix" : "";
-		const commandPrefix = prefix || getNpmBinCommand(dir);
-		return run(`${commandPrefix} xo ${extensionArgs} ${fixArg} --reporter json ${args} "."`, {
-			dir,
-			ignoreErrors: true,
-		});
-	}
-}
-
-module.exports = XO;
+module.exports = WPScriptsLintStyle;
 
 
 /***/ }),
@@ -3651,43 +4560,6 @@ module.exports = commandExists;
 
 /***/ }),
 
-/***/ 4388:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-const parseDiff = __nccwpck_require__(4833);
-
-/**
- * Parses linting errors from a unified diff
- * @param {string} diff - Unified diff
- * @returns {{path: string, firstLine: number, lastLine: number, message: string}[]} - Array of
- * parsed errors
- */
-function parseErrorsFromDiff(diff) {
-	const errors = [];
-	const files = parseDiff(diff);
-	for (const file of files) {
-		const { chunks, to: path } = file;
-		for (const chunk of chunks) {
-			const { oldStart, oldLines, changes } = chunk;
-			const chunkDiff = changes.map((change) => change.content).join("\n");
-			errors.push({
-				path,
-				firstLine: oldStart,
-				lastLine: oldStart + oldLines,
-				message: chunkDiff,
-			});
-		}
-	}
-	return errors;
-}
-
-module.exports = {
-	parseErrorsFromDiff,
-};
-
-
-/***/ }),
-
 /***/ 9149:
 /***/ ((module) => {
 
@@ -3722,15 +4594,15 @@ function getSummary(lintResult) {
 	const nrWarnings = lintResult.warning.length;
 	// Build and log a summary of linting errors/warnings
 	if (nrWarnings > 0 && nrErrors > 0) {
-		return `${nrErrors} error${nrErrors > 1 ? "s" : ""} and ${nrWarnings} warning${
+		return `\n • ${nrErrors} error${nrErrors > 1 ? "s" : ""}\n • ${nrWarnings} warning${
 			nrWarnings > 1 ? "s" : ""
 		}`;
 	}
 	if (nrErrors > 0) {
-		return `${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
+		return `\n • ${nrErrors} error${nrErrors > 1 ? "s" : ""}`;
 	}
 	if (nrWarnings > 0) {
-		return `${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
+		return `\n • ${nrWarnings} warning${nrWarnings > 1 ? "s" : ""}`;
 	}
 	return `no issues`;
 }
@@ -3942,6 +4814,14 @@ module.exports = require("tls");
 
 /***/ }),
 
+/***/ 6224:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("tty");
+
+/***/ }),
+
 /***/ 3837:
 /***/ ((module) => {
 
@@ -3954,7 +4834,7 @@ module.exports = require("util");
 /***/ ((module) => {
 
 "use strict";
-module.exports = JSON.parse('{"name":"lint-action","version":"1.10.0","description":"GitHub Action for detecting and fixing linting errors","author":{"name":"Samuel Meuli","email":"me@samuelmeuli.com","url":"https://samuelmeuli.com"},"repository":"github:wearerequired/lint-action","license":"MIT","private":true,"main":"./dist/index.js","scripts":{"test":"jest","lint":"eslint --max-warnings 0 \\"**/*.js\\"","lint:fix":"yarn lint --fix","format":"prettier --list-different \\"**/*.{css,html,js,json,jsx,less,md,scss,ts,tsx,vue,yaml,yml}\\"","format:fix":"yarn format --write","build":"ncc build ./src/index.js"},"dependencies":{"@actions/core":"^1.6.0","command-exists":"^1.2.9","parse-diff":"^0.8.1"},"peerDependencies":{},"devDependencies":{"@samuelmeuli/eslint-config":"^6.0.0","@samuelmeuli/prettier-config":"^2.0.1","@vercel/ncc":"^0.33.0","eslint":"7.32.0","eslint-config-airbnb-base":"15.0.0","eslint-config-prettier":"^8.3.0","eslint-plugin-import":"^2.25.3","eslint-plugin-jsdoc":"^37.2.0","fs-extra":"^10.0.0","jest":"^27.4.3","prettier":"^2.5.1"},"eslintConfig":{"root":true,"extends":["@samuelmeuli/eslint-config","plugin:jsdoc/recommended"],"env":{"node":true,"jest":true},"settings":{"jsdoc":{"mode":"typescript"}},"rules":{"no-await-in-loop":"off","no-unused-vars":["error",{"args":"none","varsIgnorePattern":"^_"}],"jsdoc/check-indentation":"error","jsdoc/check-syntax":"error","jsdoc/newline-after-description":["error","never"],"jsdoc/require-description":"error","jsdoc/require-hyphen-before-param-description":"error","jsdoc/require-jsdoc":"off"}},"eslintIgnore":["node_modules/","test/linters/projects/","test/tmp/","dist/"],"jest":{"globalSetup":"./test/setup.js","globalTeardown":"./test/teardown.js"},"prettier":"@samuelmeuli/prettier-config"}');
+module.exports = JSON.parse('{"name":"wpscripts-lint-action","version":"1.0.0","description":"GitHub Action for detecting and fixing WordPress linting errors","author":{"name":"Sixa","email":"info@sixa.ch","url":"https://sixa.ch/"},"repository":"github:sixach/wpscripts-lint-action","license":"MIT","private":true,"main":"./dist/index.js","scripts":{"test":"jest","lint":"eslint --max-warnings 0 \\"**/*.js\\"","lint:fix":"yarn lint --fix","format":"prettier --list-different \\"**/*.{css,html,js,json,jsx,less,md,scss,ts,tsx,vue,yaml,yml}\\"","format:fix":"yarn format --write","build":"ncc build ./src/index.js"},"dependencies":{"@actions/core":"^1.6.0","chalk":"^4.1.2","command-exists":"^1.2.9","parse-diff":"^0.8.1"},"devDependencies":{"@vercel/ncc":"^0.33.0","eslint":"7.32.0","eslint-config-airbnb-base":"15.0.0","eslint-config-prettier":"^8.3.0","eslint-plugin-import":"^2.25.3","eslint-plugin-jsdoc":"^37.2.0","fs-extra":"^10.0.0","jest":"^27.4.3","prettier":"^2.5.1"}}');
 
 /***/ })
 
@@ -3972,8 +4852,8 @@ module.exports = JSON.parse('{"name":"lint-action","version":"1.10.0","descripti
 /******/ 		}
 /******/ 		// Create a new module (and put it into the cache)
 /******/ 		var module = __webpack_module_cache__[moduleId] = {
-/******/ 			// no module.id needed
-/******/ 			// no module.loaded needed
+/******/ 			id: moduleId,
+/******/ 			loaded: false,
 /******/ 			exports: {}
 /******/ 		};
 /******/ 	
@@ -3986,11 +4866,23 @@ module.exports = JSON.parse('{"name":"lint-action","version":"1.10.0","descripti
 /******/ 			if(threw) delete __webpack_module_cache__[moduleId];
 /******/ 		}
 /******/ 	
+/******/ 		// Flag the module as loaded
+/******/ 		module.loaded = true;
+/******/ 	
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
 /******/ 	
 /************************************************************************/
+/******/ 	/* webpack/runtime/node module decorator */
+/******/ 	(() => {
+/******/ 		__nccwpck_require__.nmd = (module) => {
+/******/ 			module.paths = [];
+/******/ 			if (!module.children) module.children = [];
+/******/ 			return module;
+/******/ 		};
+/******/ 	})();
+/******/ 	
 /******/ 	/* webpack/runtime/compat */
 /******/ 	
 /******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
@@ -4002,6 +4894,7 @@ var __webpack_exports__ = {};
 const { join } = __nccwpck_require__(1017);
 
 const core = __nccwpck_require__(2186);
+const chalk = __nccwpck_require__(8818);
 
 const git = __nccwpck_require__(109);
 const { createCheck } = __nccwpck_require__(1872);
@@ -4014,7 +4907,7 @@ const { getSummary } = __nccwpck_require__(9149);
  */
 async function runAction() {
 	const context = getContext();
-	const autoFix = core.getInput("auto_fix") === "true";
+	const fixMode = core.getInput("fix_mode") === "true";
 	const skipVerification = core.getInput("git_no_verify") === "true";
 	const continueOnError = core.getInput("continue_on_error") === "true";
 	const gitName = core.getInput("git_name", { required: true });
@@ -4028,16 +4921,16 @@ async function runAction() {
 	// If on a PR from fork: Display messages regarding action limitations
 	if (isPullRequest && context.repository.hasFork) {
 		core.error(
-			"This action does not have permission to create annotations on forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
+			"❌ This action does not have permission to create annotations on forks. You may want to run it only on `push` events.",
 		);
-		if (autoFix) {
+		if (fixMode) {
 			core.error(
-				"This action does not have permission to push to forks. You may want to run it only on `push` events. See https://github.com/wearerequired/lint-action/issues/13 for details",
+				"❌ This action does not have permission to push to forks. You may want to run it only on `push` events.",
 			);
 		}
 	}
 
-	if (autoFix) {
+	if (fixMode) {
 		// Set Git committer username and password
 		git.setUserInfo(gitName, gitEmail);
 	}
@@ -4063,54 +4956,54 @@ async function runAction() {
 	for (const [linterId, linter] of Object.entries(linters)) {
 		// Determine whether the linter should be executed on the commit
 		if (core.getInput(linterId) === "true") {
-			core.startGroup(`Run ${linter.name}`);
+			core.startGroup(`🚀 Run ${linter.name}`);
 
-			const fileExtensions = core.getInput(`${linterId}_extensions`, { required: true });
 			const args = core.getInput(`${linterId}_args`);
 			const lintDirRel = core.getInput(`${linterId}_dir`) || ".";
-			const prefix = core.getInput(`${linterId}_command_prefix`);
+			const prefix = core.getInput(`${linterId}_prefix`);
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
-			core.info(`Verifying setup for ${linter.name}…`);
+			core.info(`☞ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
 			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`Verified ${linter.name} setup`);
-
-			// Determine which files should be linted
-			const fileExtList = fileExtensions.split(",");
-			core.info(`Will use ${linter.name} to check the files with extensions ${fileExtList}`);
+			core.info(`☞ Verified ${chalk.blue.bold(linter.name)} setup`);
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`Linting ${autoFix ? "and auto-fixing " : ""}files in ${lintDirAbs} with ${linter.name}…`,
-			);
-			const lintOutput = linter.lint(lintDirAbs, fileExtList, args, autoFix, prefix);
-
-			// Parse output of linting command
-			const lintResult = linter.parseOutput(context.workspace, lintOutput);
-			const summary = getSummary(lintResult);
-			core.info(
-				`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
+				`☞ ${fixMode ? "Fixing and linting" : "Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
 			);
 
-			if (!lintResult.isSuccess) {
-				hasFailures = true;
+			// Run linter command
+			const lintOutput = linter.lint(lintDirAbs, args, fixMode, prefix);
+
+			// Skip annotations for WP-Scripts Format
+			if (!(linter.name === "WP-Scripts Format")) {
+				// Parse output of linting command
+				const lintResult = linter.parseOutput(context.workspace, lintOutput);
+				const summary = getSummary(lintResult);
+				core.info(
+					`⚠️ ${linter.name} found: ${summary}\n Result: ${lintResult.isSuccess ? "Success" : "Failure"}`,
+				);
+
+				if (!lintResult.isSuccess) {
+					hasFailures = true;
+				}
+
+				const lintCheckName = checkName
+					.replace(/\${linter}/g, linter.name)
+					.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
+					.trim();
+
+				checks.push({ lintCheckName, lintResult, summary });
 			}
 
-			if (autoFix) {
+			if (fixMode) {
 				// Commit and push auto-fix changes
 				if (git.hasChanges()) {
 					git.commitChanges(commitMessage.replace(/\${linter}/g, linter.name), skipVerification);
 					git.pushChanges(skipVerification);
 				}
 			}
-
-			const lintCheckName = checkName
-				.replace(/\${linter}/g, linter.name)
-				.replace(/\${dir}/g, lintDirRel !== "." ? `${lintDirRel}` : "")
-				.trim();
-
-			checks.push({ lintCheckName, lintResult, summary });
 
 			core.endGroup();
 		}
@@ -4119,11 +5012,11 @@ async function runAction() {
 	// Add commit annotations after running all linters. To be displayed on pull requests, the
 	// annotations must be added to the last commit on the branch. This can either be a user commit or
 	// one of the auto-fix commits
-	if (isPullRequest && autoFix) {
+	if (isPullRequest && fixMode) {
 		headSha = git.getHeadSha();
 	}
 
-	core.startGroup("Create check runs with commit annotations");
+	core.startGroup("📝 Create check runs with commit annotations");
 	await Promise.all(
 		checks.map(({ lintCheckName, lintResult, summary }) =>
 			createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
@@ -4132,7 +5025,7 @@ async function runAction() {
 	core.endGroup();
 
 	if (hasFailures && !continueOnError) {
-		core.setFailed("Linting failures detected. See check runs with annotations for details.");
+		core.setFailed("❌ Linting failures detected. See check runs with annotations for details.");
 	}
 }
 

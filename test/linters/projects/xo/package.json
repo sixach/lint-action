@@ -1,8 +1,0 @@
-{
-	"name": "test-xo",
-	"main": "index.js",
-	"private": true,
-	"devDependencies": {
-		"xo": "^0.38.2"
-	}
-}

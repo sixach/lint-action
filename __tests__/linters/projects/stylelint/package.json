@@ -1,0 +1,8 @@
+{
+	"name": "test-stylelint",
+	"main": "index.js",
+	"private": true,
+	"devDependencies": {
+		"@wordpress/scripts": "^19.2.2"
+	}
+}
