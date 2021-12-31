@@ -4964,13 +4964,13 @@ async function runAction() {
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
-			core.info(`➡️ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
+			core.info(`1️⃣ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
 			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`➡️ Verified ${chalk.blue.bold(linter.name)} setup`);
+			core.info(`2️⃣ Verified ${chalk.blue.bold(linter.name)} setup`);
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`${fixMode ? "🔨 Fixing and linting" : "🔎 Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
+				`${fixMode ? "3️⃣ Fixing and linting" : "3️⃣ Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
 			);
 
 			// Run linter command
