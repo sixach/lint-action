@@ -521,16 +521,6 @@
     "@types/yargs" "^16.0.0"
     "chalk" "^4.0.0"
 
-"@samuelmeuli/eslint-config@^6.0.0":
-  "integrity" "sha512-CnICdJIFgfWv/p//jDXd7atart+2Ww7vSu+VX+73f65XEdoU9g2MSxom27uOg8cdL/CTrHXdUbcnW3Br7E2NGg=="
-  "resolved" "https://registry.npmjs.org/@samuelmeuli/eslint-config/-/eslint-config-6.0.0.tgz"
-  "version" "6.0.0"
-
-"@samuelmeuli/prettier-config@^2.0.1":
-  "integrity" "sha512-K9Xr+CS/UvQ+8gkKkPfupPLXxZj8s0kLz9ZOo+6V0QJmOj/VEJdaGR+0cVCDQXDFcOdzdP11O/KrbOgjniWb2w=="
-  "resolved" "https://registry.npmjs.org/@samuelmeuli/prettier-config/-/prettier-config-2.0.1.tgz"
-  "version" "2.0.1"
-
 "@sinonjs/commons@^1.7.0":
   "integrity" "sha512-892K+kWUUi3cl+LlqEWIDrhvLgdL79tECi8JZUyq6IviKy/DNhuzCRlbHUjxK89f4ypPMMaFnFuR9Ie6DoIMsw=="
   "resolved" "https://registry.npmjs.org/@sinonjs/commons/-/commons-1.8.1.tgz"
@@ -917,10 +907,10 @@
     "escape-string-regexp" "^1.0.5"
     "supports-color" "^5.3.0"
 
-"chalk@^4.0.0":
-  "integrity" "sha512-qwx12AxXe2Q5xQ43Ac//I6v5aXTipYrSESdOgzrN+9XjgEpyjpKuvSGaN4qE93f7TQTlerQQ8S+EQ0EyDoVL1A=="
-  "resolved" "https://registry.npmjs.org/chalk/-/chalk-4.1.0.tgz"
-  "version" "4.1.0"
+"chalk@^4.0.0", "chalk@^4.1.2":
+  "integrity" "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="
+  "resolved" "https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz"
+  "version" "4.1.2"
   dependencies:
     "ansi-styles" "^4.1.0"
     "supports-color" "^7.1.0"
@@ -1316,7 +1306,7 @@
   "resolved" "https://registry.npmjs.org/eslint-visitor-keys/-/eslint-visitor-keys-2.0.0.tgz"
   "version" "2.0.0"
 
-"eslint@*", "eslint@^2 || ^3 || ^4 || ^5 || ^6 || ^7.2.0 || ^8", "eslint@^7.0.0 || ^8.0.0", "eslint@^7.32.0 || ^8.2.0", "eslint@>=7.0.0", "eslint@7.32.0":
+"eslint@^2 || ^3 || ^4 || ^5 || ^6 || ^7.2.0 || ^8", "eslint@^7.0.0 || ^8.0.0", "eslint@^7.32.0 || ^8.2.0", "eslint@>=7.0.0", "eslint@7.32.0":
   "integrity" "sha512-VHZ8gX+EDfz+97jGcgyGCyRia/dPOd6Xh9yPv8Bl1+SoaIwD+a/vlrOmGRUyOYu7MwUhc7CxqeaDZU13S4+EpA=="
   "resolved" "https://registry.npmjs.org/eslint/-/eslint-7.32.0.tgz"
   "version" "7.32.0"
@@ -2767,7 +2757,7 @@
   "resolved" "https://registry.npmjs.org/prelude-ls/-/prelude-ls-1.1.2.tgz"
   "version" "1.1.2"
 
-"prettier@^2.0.0", "prettier@^2.5.1":
+"prettier@^2.5.1":
   "integrity" "sha512-vBZcPRUR5MZJwoyi3ZoyQlc1rXeEck8KgeC9AwwOn+exuxLxq5toTRDTSaVrXHxelDMHy9zlicw8u66yxoSUFg=="
   "resolved" "https://registry.npmjs.org/prettier/-/prettier-2.5.1.tgz"
   "version" "2.5.1"

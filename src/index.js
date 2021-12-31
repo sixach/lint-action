@@ -1,6 +1,7 @@
 const { join } = require("path");
 
 const core = require("@actions/core");
+const chalk = require("chalk");
 
 const git = require("./git");
 const { createCheck } = require("./github/api");
@@ -27,11 +28,11 @@ async function runAction() {
 	// If on a PR from fork: Display messages regarding action limitations
 	if (isPullRequest && context.repository.hasFork) {
 		core.error(
-			"This action does not have permission to create annotations on forks. You may want to run it only on `push` events.",
+			"❌ This action does not have permission to create annotations on forks. You may want to run it only on `push` events.",
 		);
 		if (fixMode) {
 			core.error(
-				"This action does not have permission to push to forks. You may want to run it only on `push` events.",
+				"❌ This action does not have permission to push to forks. You may want to run it only on `push` events.",
 			);
 		}
 	}
@@ -62,7 +63,7 @@ async function runAction() {
 	for (const [linterId, linter] of Object.entries(linters)) {
 		// Determine whether the linter should be executed on the commit
 		if (core.getInput(linterId) === "true") {
-			core.startGroup(`Run ${linter.name}`);
+			core.startGroup(`🚀 Run ${linter.name}`);
 
 			const args = core.getInput(`${linterId}_args`);
 			const lintDirRel = core.getInput(`${linterId}_dir`) || ".";
@@ -70,13 +71,13 @@ async function runAction() {
 			const lintDirAbs = join(context.workspace, lintDirRel);
 
 			// Check that the linter and its dependencies are installed
-			core.info(`Verifying setup for ${linter.name}…`);
+			core.info(`❔ Verifying setup for ${chalk.blue.bold(linter.name)}…`);
 			await linter.verifySetup(lintDirAbs, prefix);
-			core.info(`Verified ${linter.name} setup`);
+			core.info(`✔️ Verified ${chalk.blue.bold(linter.name)} setup`);
 
 			// Lint and optionally auto-fix the matching files, parse code style violations
 			core.info(
-				`${fixMode ? "Fixing and linting" : "Linting"} files in ${lintDirAbs} with ${linter.name}…`,
+				`${fixMode ? "🔨 Fixing and linting" : "🔎 Linting"} files in ${lintDirAbs} with ${chalk.blue.bold(linter.name)}…`,
 			);
 
 			// Run linter command
@@ -88,7 +89,7 @@ async function runAction() {
 				const lintResult = linter.parseOutput(context.workspace, lintOutput);
 				const summary = getSummary(lintResult);
 				core.info(
-					`${linter.name} found ${summary} (${lintResult.isSuccess ? "success" : "failure"})`,
+					`ℹ️ ${linter.name} found: ${summary}\n\tResult: ${lintResult.isSuccess ? "Success" : "Failure"})`,
 				);
 
 				if (!lintResult.isSuccess) {
@@ -122,7 +123,7 @@ async function runAction() {
 		headSha = git.getHeadSha();
 	}
 
-	core.startGroup("Create check runs with commit annotations");
+	core.startGroup("📝 Create check runs with commit annotations");
 	await Promise.all(
 		checks.map(({ lintCheckName, lintResult, summary }) =>
 			createCheck(lintCheckName, headSha, context, lintResult, neutralCheckOnWarning, summary),
@@ -131,7 +132,7 @@ async function runAction() {
 	core.endGroup();
 
 	if (hasFailures && !continueOnError) {
-		core.setFailed("Linting failures detected. See check runs with annotations for details.");
+		core.setFailed("❌ Linting failures detected. See check runs with annotations for details.");
 	}
 }
 
