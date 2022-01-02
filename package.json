@@ -1,5 +1,5 @@
 {
-	"name": "wpscripts-lint-action",
+	"name": "wp-scripts-lint-action",
 	"version": "1.0.0",
 	"description": "GitHub Action for detecting and fixing WordPress linting errors",
 	"author": {
@@ -7,7 +7,7 @@
 		"email": "info@sixa.ch",
 		"url": "https://sixa.ch/"
 	},
-	"repository": "github:sixach/wpscripts-lint-action",
+	"repository": "github:sixach/wp-scripts-lint-action",
 	"license": "MIT",
 	"private": true,
 	"main": "./dist/index.js",
