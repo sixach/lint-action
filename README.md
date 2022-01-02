@@ -1,4 +1,4 @@
-# ✨ WPScripts Lint Action
+# ✨ WP-Scripts Lint Action
 
 This is a WordPress linter action, specifically designed to work with **@wordpress/scripts** tool. Other Github linters don't work very well with WordPress configs, unless you do the trick with importing ESLint/Prettier/StyleLint configs manually. This action runs the command and outputs errors/warnings in a Github-friendly way.
 
@@ -41,7 +41,7 @@ It helps to enforce coding style guidelines for your files (JavaScript, YAML) by
 Create a new GitHub Actions workflow in your project, e.g. at `.github/workflows/lint.yml`. The content of the file should be in the following format:
 
 ```yml
-name: WPScripts Lint
+name: WP-Scripts Lint
 
 on:
   # Trigger the workflow on push or pull request,
@@ -73,7 +73,7 @@ jobs:
         run: npm ci
 
       - name: Run linters
-        uses: sixach/wpscripts-lint-action@v1
+        uses: sixach/wp-scripts-lint-action@v1
         with:
           # Enable your linters here
           format: true
@@ -92,7 +92,7 @@ The action doesn't install the wp-scripts for you; you are responsible for insta
 
 ```yml
 - name: Run linters
-  uses: sixach/wpscripts-lint-action@v1
+  uses: sixach/wp-scripts-lint-action@v1
   with:
     # Enable your linters here
     lint_js: true
